@@ -1,75 +1,43 @@
 import Link from "next/link";
-import {
-  BookOpen,
-  FileDown,
-  FileText,
-  Plus,
-  Receipt,
-  Settings2,
-  Wallet,
-  Landmark,
-  ArrowUpRight,
-} from "lucide-react";
+import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import {
-  formatDual,
-  formatMoney,
-  getExchangeRate,
-} from "@/lib/company";
+import { formatMoney, getExchangeRate } from "@/lib/company";
 import { Button } from "@/components/ui";
-import { PageHeader, SectionCard } from "@/components/layout";
+import { PageHeader } from "@/components/layout";
 
-const quickActions = [
-  {
-    href: "/app/invoices",
-    label: "Facturas",
-    icon: FileText,
-    tone: "bg-[var(--brand-accent-muted)] text-[var(--brand-accent)]",
-  },
-  {
-    href: "/app/receivables",
-    label: "Por cobrar",
-    icon: Receipt,
-    tone: "bg-[var(--brand-accent-muted)] text-[var(--brand-accent)]",
-  },
-  {
-    href: "/app/payables",
-    label: "Por pagar",
-    icon: BookOpen,
-    tone: "bg-neutral-100 text-neutral-800",
-  },
-  {
-    href: "/app/payments",
-    label: "Pagos",
-    icon: FileDown,
-    tone: "bg-[var(--brand-accent-muted)] text-[var(--brand-accent-hover)]",
-  },
-  {
-    href: "/app/withholdings",
-    label: "Retenciones",
-    icon: FileDown,
-    tone: "bg-neutral-100 text-neutral-700",
-  },
-  {
-    href: "/app/reports",
-    label: "Reportes",
-    icon: Settings2,
-    tone: "bg-neutral-100 text-[var(--color-foreground)]",
-  },
-];
+function greetingForHour(hour: number) {
+  if (hour < 12) return "Buenos días";
+  if (hour < 19) return "Buenas tardes";
+  return "Buenas noches";
+}
 
-type JournalCard = {
-  id: string;
-  code: string;
-  name: string;
-  journal_type: string;
-  balance: number;
-  openCount: number;
-  openAmount: number;
-  href: string;
-  cta: string;
-  accent: string;
-};
+function paymentLabel(state: string | null | undefined) {
+  switch (state) {
+    case "paid":
+      return "Pagada";
+    case "partial":
+      return "Parcial";
+    case "not_paid":
+      return "Pendiente";
+    default:
+      return state || "—";
+  }
+}
+
+function docStateLabel(state: string | null | undefined) {
+  switch (state) {
+    case "draft":
+      return "Borrador";
+    case "confirmed":
+      return "Confirmada";
+    case "done":
+      return "Emitida";
+    case "cancelled":
+      return "Anulada";
+    default:
+      return state || "—";
+  }
+}
 
 export default async function AppHomePage() {
   const supabase = await createClient();
@@ -99,304 +67,198 @@ export default async function AppHomePage() {
     | undefined;
   const hasCompany = Boolean(company);
   const today = new Date().toISOString().slice(0, 10);
+  const greeting = greetingForHour(new Date().getUTCHours() - 4); // VE approx
 
   const [
-    { count: partnerCount },
-    { count: invoiceCount },
-    { count: bookCount },
     rate,
-    { data: journals },
-    { data: moveLines },
     { data: openInvoices },
+    { count: invoiceCount },
+    { data: recentInvoices },
   ] = await Promise.all([
-    company
-      ? supabase
-          .from("partners")
-          .select("*", { count: "exact", head: true })
-          .eq("company_id", company.id)
-      : Promise.resolve({ count: 0 }),
-    company
-      ? supabase
-          .from("invoices")
-          .select("*", { count: "exact", head: true })
-          .eq("company_id", company.id)
-      : Promise.resolve({ count: 0 }),
-    company
-      ? supabase
-          .from("fiscal_books")
-          .select("*", { count: "exact", head: true })
-          .eq("company_id", company.id)
-      : Promise.resolve({ count: 0 }),
     company ? getExchangeRate(company.id, today) : Promise.resolve(null),
     company
       ? supabase
-          .from("account_journals")
-          .select("id, code, name, journal_type, default_account_id")
-          .eq("company_id", company.id)
-          .order("code")
-      : Promise.resolve({ data: null }),
-    company
-      ? supabase
-          .from("account_move_lines")
-          .select("account_id, debit, credit")
-          .eq("company_id", company.id)
-      : Promise.resolve({ data: null }),
-    company
-      ? supabase
           .from("invoices")
-          .select("id, move_type, amount_residual, amount_total")
+          .select("id, move_type, amount_residual, amount_total, payment_state")
           .eq("company_id", company.id)
           .gt("amount_residual", 0)
           .neq("state", "cancelled")
       : Promise.resolve({ data: null }),
+    company
+      ? supabase
+          .from("invoices")
+          .select("*", { count: "exact", head: true })
+          .eq("company_id", company.id)
+          .gte("invoice_date", `${today.slice(0, 7)}-01`)
+      : Promise.resolve({ count: 0 }),
+    company
+      ? supabase
+          .from("invoices")
+          .select(
+            "id, invoice_number, amount_total, payment_state, state, move_type, partners(name)",
+          )
+          .eq("company_id", company.id)
+          .order("invoice_date", { ascending: false })
+          .limit(5)
+      : Promise.resolve({ data: null }),
   ]);
 
-  const accountBalance = new Map<string, number>();
-  for (const line of moveLines || []) {
-    const bal = (accountBalance.get(line.account_id) || 0) + Number(line.debit) - Number(line.credit);
-    accountBalance.set(line.account_id, bal);
-  }
+  const saleOpen = (openInvoices || []).filter((i) =>
+    String(i.move_type).startsWith("out_"),
+  );
+  const purchaseOpen = (openInvoices || []).filter((i) =>
+    String(i.move_type).startsWith("in_"),
+  );
+  const cxc = saleOpen.reduce((s, i) => s + Number(i.amount_residual || 0), 0);
+  const cxp = purchaseOpen.reduce(
+    (s, i) => s + Number(i.amount_residual || 0),
+    0,
+  );
 
-  const saleOpen = (openInvoices || []).filter((i) => String(i.move_type).startsWith("out_"));
-  const purchaseOpen = (openInvoices || []).filter((i) => String(i.move_type).startsWith("in_"));
-
-  const journalCards: JournalCard[] = (journals || [])
-    .filter((j) => ["bank", "cash", "sale", "purchase"].includes(j.journal_type))
-    .map((j) => {
-      const isLiquidity = j.journal_type === "bank" || j.journal_type === "cash";
-      const balance = j.default_account_id
-        ? accountBalance.get(j.default_account_id) || 0
-        : 0;
-      const open = j.journal_type === "sale" ? saleOpen : j.journal_type === "purchase" ? purchaseOpen : [];
-      const openAmount = open.reduce((s, i) => s + Number(i.amount_residual || 0), 0);
-      const href =
-        j.journal_type === "sale"
-          ? "/app/receivables"
-          : j.journal_type === "purchase"
-            ? "/app/payables"
-            : "/app/payments";
-      const cta =
-        j.journal_type === "sale"
-          ? open.length
-            ? `Cobrar ${open.length} doc.`
-            : "Ver por cobrar"
-          : j.journal_type === "purchase"
-            ? open.length
-              ? `Pagar ${open.length} doc.`
-              : "Ver por pagar"
-            : "Nueva transacción";
-      const accent =
-        j.journal_type === "bank"
-          ? "from-[#2563eb] to-[#1d4ed8]"
-          : j.journal_type === "cash"
-            ? "from-[#3b82f6] to-[#2563eb]"
-            : j.journal_type === "sale"
-              ? "from-[#2563eb] to-[#1e40af]"
-              : "from-[#64748b] to-[#475569]";
-      return {
-        id: j.id,
-        code: j.code,
-        name: j.name,
-        journal_type: j.journal_type,
-        balance: isLiquidity ? balance : openAmount,
-        openCount: open.length,
-        openAmount,
-        href,
-        cta,
-        accent,
-      };
-    });
-
-  return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Tablero"
-        title={hasCompany ? company!.name : "Bienvenido a Cifra"}
-        description={
-          hasCompany
-            ? `RIF ${company!.rif}${rate ? ` · tasa ${formatMoney(rate)} Bs/USD` : " · configura la tasa del día en Configuración"}.`
-            : "Registra tu empresa con RIF para emitir libros y retenciones SENIAT."
-        }
-        actions={
-          !hasCompany ? (
+  if (!hasCompany) {
+    return (
+      <div className="cifra-motion-in space-y-6">
+        <PageHeader
+          eyebrow="Bienvenido"
+          title="Cifra"
+          description="Registra tu empresa con RIF para emitir libros y retenciones SENIAT."
+          actions={
             <Link href="/app/empresa/nueva">
               <Button type="button">
                 <Plus className="h-4 w-4" aria-hidden />
                 Crear empresa
               </Button>
             </Link>
-          ) : (
-            <Link href="/app/config">
-              <Button type="button" variant="secondary">
-                Tasa del día
-              </Button>
-            </Link>
-          )
-        }
-      />
+          }
+        />
+      </div>
+    );
+  }
 
-      {hasCompany && journalCards.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold">Operación</h2>
-              <p className="text-xs text-[var(--color-muted-foreground)]">
-                Caja, bancos y pendientes de cobro/pago.
-              </p>
-            </div>
-            <Link
-              href="/app/accounts"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
-            >
-              Plan de cuentas <ArrowUpRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {journalCards.map((card) => (
-              <article
-                key={card.id}
-                className="flex flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-sm)]"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-foreground)]">
-                      {card.code} · {card.journal_type}
-                    </p>
-                    <h3 className="mt-1 text-base font-semibold">{card.name}</h3>
-                  </div>
-                  <span
-                    className={`flex h-9 w-9 items-center justify-center bg-gradient-to-br ${card.accent} text-white`}
-                  >
-                    {card.journal_type === "bank" || card.journal_type === "cash" ? (
-                      <Wallet className="h-4 w-4" aria-hidden />
-                    ) : card.journal_type === "sale" ? (
-                      <Receipt className="h-4 w-4" aria-hidden />
-                    ) : (
-                      <Landmark className="h-4 w-4" aria-hidden />
-                    )}
-                  </span>
-                </div>
+  return (
+    <div className="space-y-7">
+      <div className="cifra-motion-in flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1.5">
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            {greeting}
+          </p>
+          <h1 className="truncate text-[1.75rem] font-bold tracking-tight text-[var(--color-foreground)] md:text-[1.85rem]">
+            {company!.name}
+          </h1>
+        </div>
+        <Link href="/app/invoices" className="shrink-0">
+          <Button type="button" className="px-[18px] py-3">
+            Nueva factura
+          </Button>
+        </Link>
+      </div>
 
-                <div className="mt-4 flex-1">
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--color-muted-foreground)]">
-                    {card.journal_type === "bank" || card.journal_type === "cash"
-                      ? "Balance"
-                      : "Pendiente"}
-                  </p>
-                  <p
-                    className={`mt-1 font-mono text-lg font-semibold tabular-nums ${
-                      card.balance < 0 ? "text-[var(--color-destructive)]" : ""
-                    }`}
-                  >
-                    {rate ? formatDual(card.balance, rate) : `${formatMoney(card.balance)} Bs`}
-                  </p>
-                  {(card.journal_type === "sale" || card.journal_type === "purchase") && (
-                    <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
-                      {card.openCount} documento{card.openCount === 1 ? "" : "s"} abierto
-                      {card.openCount === 1 ? "" : "s"}
-                    </p>
-                  )}
-                </div>
+      <div className="cifra-motion-in-delay flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-[18px] py-4">
+        <span className="text-xs text-[var(--color-muted-foreground)]">
+          Tasa BCV
+        </span>
+        <span className="text-base font-bold tracking-tight">
+          {rate ? `${formatMoney(rate)} Bs / USD` : "Sin tasa del día"}
+        </span>
+        <span className="text-xs text-[var(--color-muted-foreground)]">
+          {rate
+            ? "Actualizada hoy · dual currency"
+            : "Configúrala en Configuración"}
+        </span>
+        {!rate ? (
+          <Link
+            href="/app/config"
+            className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
+          >
+            Ir a config
+          </Link>
+        ) : null}
+      </div>
 
-                <Link
-                  href={card.href}
-                  className={`mt-4 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-gradient-to-r ${card.accent} px-3 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-95`}
+      <div className="cifra-motion-in-delay grid gap-4 sm:grid-cols-3">
+        {[
+          {
+            label: "Por cobrar",
+            value: `Bs ${formatMoney(cxc)}`,
+            hint: `${saleOpen.length} factura${saleOpen.length === 1 ? "" : "s"} abierta${saleOpen.length === 1 ? "" : "s"}`,
+            href: "/app/receivables",
+          },
+          {
+            label: "Por pagar",
+            value: `Bs ${formatMoney(cxp)}`,
+            hint: `${purchaseOpen.length} factura${purchaseOpen.length === 1 ? "" : "s"} abierta${purchaseOpen.length === 1 ? "" : "s"}`,
+            href: "/app/payables",
+          },
+          {
+            label: "Facturas del mes",
+            value: String(invoiceCount ?? 0),
+            hint: "Ventas + compras",
+            href: "/app/invoices",
+          },
+        ].map((m) => (
+          <Link
+            key={m.label}
+            href={m.href}
+            className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-[18px] transition-colors hover:border-[var(--color-primary)]/40"
+          >
+            <p className="text-xs text-[var(--color-muted-foreground)]">
+              {m.label}
+            </p>
+            <p className="mt-2 text-[1.35rem] font-bold tracking-tight tabular-nums">
+              {m.value}
+            </p>
+            <p className="mt-1 text-[11px] text-[var(--color-muted-foreground)]">
+              {m.hint}
+            </p>
+          </Link>
+        ))}
+      </div>
+
+      <section className="cifra-motion-in-delay rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-[18px]">
+        <h2 className="text-sm font-semibold">Actividad reciente</h2>
+        {(recentInvoices || []).length === 0 ? (
+          <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">
+            Aún no hay documentos. Crea la primera factura.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-[var(--color-muted)]">
+            {(recentInvoices || []).map((inv) => {
+              const partner = inv.partners as
+                | { name: string }
+                | { name: string }[]
+                | null;
+              const partnerName = Array.isArray(partner)
+                ? partner[0]?.name
+                : partner?.name;
+              return (
+                <li
+                  key={inv.id}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"
                 >
-                  {card.cta}
-                </Link>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {hasCompany && (
-        <section className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--brand-accent-muted)] px-6 py-7 md:px-8">
-          <p className="text-sm font-medium text-[var(--color-muted-foreground)]">Indicadores</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {[
-              { label: "Terceros", value: partnerCount ?? 0 },
-              { label: "Facturas", value: invoiceCount ?? 0 },
-              { label: "Libros", value: bookCount ?? 0 },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-4 py-3"
-              >
-                <p className="text-xs text-[var(--color-muted-foreground)]">{stat.label}</p>
-                <p className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-foreground)]">
-                  {stat.value}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {hasCompany && (
-        <>
-          <SectionCard title="Accesos rápidos" description="Flujo operativo → fiscal → sistema.">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              {quickActions.map((item) => {
-                const Icon = item.icon;
-                return (
                   <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex flex-col items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-muted)]/40 p-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-[var(--shadow-sm)]"
+                    href="/app/invoices"
+                    className="font-semibold text-[var(--color-primary)] hover:underline"
                   >
-                    <span
-                      className={`flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}
-                    >
-                      <Icon className="h-5 w-5" aria-hidden />
-                    </span>
-                    <span className="text-sm font-semibold">{item.label}</span>
+                    {inv.invoice_number}
                   </Link>
-                );
-              })}
-            </div>
-          </SectionCard>
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            <SectionCard title="Facturación">
-              <p className="text-sm text-[var(--color-muted-foreground)]">
-                Documentos con control, multi-alícuota, dual currency e IVA retenido.
-              </p>
-              <Link
-                href="/app/invoices"
-                className="mt-4 inline-flex text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
-              >
-                Ir a facturas
-              </Link>
-            </SectionCard>
-            <SectionCard title="Retenciones SENIAT">
-              <div className="flex items-center gap-2">
-                <Receipt className="h-4 w-4 text-[var(--color-accent)]" aria-hidden />
-                <p className="text-sm text-[var(--color-muted-foreground)]">
-                  IVA TXT 99035 e ISLR XML.
-                </p>
-              </div>
-              <Link
-                href="/app/withholdings"
-                className="mt-4 inline-flex text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
-              >
-                Ir a retenciones
-              </Link>
-            </SectionCard>
-            <SectionCard title="Libros del período">
-              <p className="text-sm text-[var(--color-muted-foreground)]">
-                Compras y ventas listos para fiscalización (excluye sin_cred).
-              </p>
-              <Link
-                href="/app/books"
-                className="mt-4 inline-flex text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
-              >
-                Ir a libros
-              </Link>
-            </SectionCard>
-          </div>
-        </>
-      )}
+                  <span className="min-w-0 flex-1 truncate text-[var(--color-foreground)]/80">
+                    {partnerName || "—"}
+                  </span>
+                  <span className="font-semibold tabular-nums">
+                    Bs {formatMoney(inv.amount_total)}
+                  </span>
+                  <span className="w-24 text-right text-xs text-[var(--color-muted-foreground)]">
+                    {docStateLabel(inv.state)}
+                    {inv.payment_state && inv.state !== "draft"
+                      ? ` · ${paymentLabel(inv.payment_state)}`
+                      : ""}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

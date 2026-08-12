@@ -20,7 +20,7 @@ export default function AuthLayout({
           Cifra
         </h1>
         <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-          Contabilidad Venezuela
+          Contabilidad VE
         </p>
       </div>
 
