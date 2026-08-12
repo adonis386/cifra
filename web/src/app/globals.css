@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 /*
- * Cifra — producto independiente.
- * Toque IG: acento #2563EB y créditos de desarrollador (no tipografías de marca).
+ * Cifra — look de prueba (pen.dev mock).
+ * Acento IG: #2563EB. UI clara + sidebar slate.
  */
 :root {
   --brand-accent: #2563eb;
@@ -16,6 +16,7 @@
   --color-accent: #2563eb;
   --color-accent-hover: #1d4ed8;
   --color-background: #f8fafc;
+  --color-background-end: #eff6ff;
   --color-foreground: #0f172a;
   --color-muted: #f1f5f9;
   --color-muted-foreground: #64748b;
@@ -25,12 +26,18 @@
   --color-surface: #ffffff;
   --color-success: #15803d;
 
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --color-sidebar: #0f172a;
+  --color-sidebar-hover: #1e293b;
+  --color-sidebar-text: #cbd5e1;
+  --color-sidebar-muted: #64748b;
+  --color-sidebar-active: #ffffff;
 
-  --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 12px 32px rgba(15, 23, 42, 0.08);
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 @theme inline {
@@ -55,7 +62,9 @@
 }
 
 body {
-  background: var(--color-background);
+  background:
+    linear-gradient(225deg, var(--color-background) 0%, var(--color-background-end) 100%);
+  background-attachment: fixed;
   color: var(--color-foreground);
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
 }
@@ -69,4 +78,36 @@ a,
 button,
 [role="button"] {
   cursor: pointer;
+}
+
+@keyframes cifra-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cifra-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.cifra-motion-in {
+  animation: cifra-fade-up 420ms ease-out both;
+}
+
+.cifra-motion-in-delay {
+  animation: cifra-fade-up 480ms ease-out 80ms both;
+}
+
+.cifra-motion-soft {
+  animation: cifra-fade-in 360ms ease-out both;
 }

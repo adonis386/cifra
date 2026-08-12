@@ -36,13 +36,13 @@ const groups = [
       { href: "/app/invoices", label: "Facturas", icon: FileText },
       { href: "/app/receivables", label: "Por cobrar", icon: CircleDollarSign },
       { href: "/app/payables", label: "Por pagar", icon: HandCoins },
-      { href: "/app/payments", label: "Pagos", icon: Wallet },
+      { href: "/app/payments", label: "Cobros / Pagos", icon: Wallet },
     ],
   },
   {
     label: "Libro",
     items: [
-      { href: "/app/treasury", label: "Caja y bancos", icon: Landmark },
+      { href: "/app/treasury", label: "Tesorería", icon: Landmark },
       { href: "/app/entries", label: "Asientos", icon: ScrollText },
       { href: "/app/ledger", label: "Mayor", icon: Library },
       { href: "/app/statements", label: "Estado de cuenta", icon: ClipboardList },
@@ -58,10 +58,6 @@ const groups = [
       { href: "/app/withholdings", label: "Retenciones", icon: Receipt },
       { href: "/app/municipal", label: "Municipal", icon: Landmark },
     ],
-  },
-  {
-    label: "Sistema",
-    items: [{ href: "/app/config", label: "Configuración", icon: Settings2 }],
   },
 ];
 
@@ -81,103 +77,116 @@ export function AppShell({
     companies.find((c) => c.id === activeCompanyId) || companies[0] || null;
 
   return (
-    <div className="min-h-screen bg-[var(--color-background)] text-[var(--color-foreground)]">
-      <div className="mx-auto flex min-h-screen max-w-[1440px] gap-4 p-3 md:p-4">
-        <aside className="hidden w-64 shrink-0 flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-5 shadow-[var(--shadow-sm)] md:flex">
-          <div className="mb-6 px-3">
-            <p className="text-lg font-bold tracking-tight text-[var(--color-foreground)]">
-              Cifra
-            </p>
-            <p className="text-xs text-[var(--color-muted-foreground)]">
-              Contabilidad Venezuela
-            </p>
-          </div>
-
-          <nav className="flex flex-1 flex-col gap-5 overflow-y-auto">
-            {groups.map((group) => (
-              <div key={group.label}>
-                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
-                  {group.label}
-                </p>
-                <div className="space-y-1">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive =
-                      item.href === "/app"
-                        ? pathname === "/app"
-                        : pathname.startsWith(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-center gap-2.5 rounded-[var(--radius-md)] px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${
-                          isActive
-                            ? "bg-[var(--color-primary)] text-white shadow-[var(--shadow-sm)]"
-                            : "text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]"
-                        }`}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
-
-          <div className="mt-auto space-y-3 border-t border-[var(--color-border)] px-1 pt-4">
-            <p className="px-2 text-[10px] text-[var(--color-muted-foreground)]">
-              Desarrollado por{" "}
-              <a
-                href="https://www.informaticagonzalez.com"
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-[var(--color-primary)] hover:underline"
-              >
-                Informática González
-              </a>
-            </p>
-            <form action={signOut}>
-              <Button type="submit" variant="ghost" className="w-full justify-start">
-                <LogOut className="h-4 w-4" aria-hidden />
-                Salir
-              </Button>
-            </form>
-          </div>
-        </aside>
-
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <header className="flex items-center justify-between gap-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-sm)] md:px-6">
-            <div className="min-w-0 md:hidden">
-              <p className="text-base font-bold tracking-tight">Cifra</p>
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">
-                {active ? active.name : "Sin empresa"}
-              </p>
-              <p className="truncate font-mono text-xs text-[var(--color-muted-foreground)]">
-                {active ? active.rif : "Crea tu primera empresa"}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="hidden max-w-[180px] truncate text-xs text-[var(--color-muted-foreground)] sm:inline">
-                {email}
-              </span>
-              <Link
-                href="/app/empresa/nueva"
-                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition-colors duration-200 hover:bg-[var(--brand-accent-muted)]"
-              >
-                <Building2 className="h-3.5 w-3.5" aria-hidden />
-                Nueva empresa
-              </Link>
-            </div>
-          </header>
-
-          <main className="flex-1 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-6 pb-24 shadow-[var(--shadow-sm)] md:px-8 md:py-8 md:pb-8">
-            {children}
-          </main>
+    <div className="flex min-h-screen text-[var(--color-foreground)]">
+      <aside className="cifra-motion-soft sticky top-0 hidden h-screen w-[240px] shrink-0 flex-col bg-[var(--color-sidebar)] px-5 py-7 md:flex">
+        <div className="mb-8 px-1">
+          <p className="text-[1.75rem] font-bold leading-none tracking-tight text-white">
+            Cifra
+          </p>
+          <p className="mt-1.5 text-xs text-[var(--color-sidebar-muted)]">
+            Contabilidad VE
+          </p>
         </div>
+
+        <nav className="flex flex-1 flex-col gap-5 overflow-y-auto pb-4">
+          {groups.map((group) => (
+            <div key={group.label}>
+              <p className="mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--color-sidebar-muted)]">
+                {group.label}
+              </p>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive =
+                    item.href === "/app"
+                      ? pathname === "/app"
+                      : pathname.startsWith(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2 text-[13px] transition-colors duration-200 ${
+                        isActive
+                          ? "bg-[var(--color-sidebar-hover)] font-semibold text-[var(--color-sidebar-active)]"
+                          : "font-medium text-[var(--color-sidebar-text)] hover:bg-[var(--color-sidebar-hover)] hover:text-white"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="mt-auto space-y-3 border-t border-white/10 pt-4">
+          <Link
+            href="/app/config"
+            className={`flex items-center gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2 text-[13px] font-medium transition-colors ${
+              pathname.startsWith("/app/config")
+                ? "bg-[var(--color-sidebar-hover)] text-white"
+                : "text-[var(--color-sidebar-text)] hover:bg-[var(--color-sidebar-hover)] hover:text-white"
+            }`}
+          >
+            <Settings2 className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+            Configuración
+          </Link>
+          <p className="px-2.5 text-[10px] leading-relaxed text-[var(--color-sidebar-muted)]">
+            Desarrollado por{" "}
+            <a
+              href="https://www.informaticagonzalez.com"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-[#93c5fd] hover:underline"
+            >
+              Informática González
+            </a>
+          </p>
+          <form action={signOut}>
+            <Button
+              type="submit"
+              variant="ghost"
+              className="w-full justify-start text-[var(--color-sidebar-text)] hover:bg-[var(--color-sidebar-hover)] hover:text-white"
+            >
+              <LogOut className="h-4 w-4" aria-hidden />
+              Salir
+            </Button>
+          </form>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center justify-between gap-4 border-b border-[var(--color-border)]/80 bg-white/70 px-4 py-3 backdrop-blur-md md:px-10">
+          <div className="min-w-0 md:hidden">
+            <p className="text-lg font-bold tracking-tight">Cifra</p>
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">
+              {active ? active.name : "Sin empresa"}
+            </p>
+            <p className="truncate font-mono text-xs text-[var(--color-muted-foreground)]">
+              {active ? active.rif : "Crea tu primera empresa"}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="hidden max-w-[180px] truncate text-xs text-[var(--color-muted-foreground)] sm:inline">
+              {email}
+            </span>
+            <Link
+              href="/app/empresa/nueva"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--color-foreground)] transition-colors duration-200 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+            >
+              <Building2 className="h-3.5 w-3.5" aria-hidden />
+              Nueva empresa
+            </Link>
+          </div>
+        </header>
+
+        <main className="cifra-motion-in flex-1 px-4 py-6 pb-24 md:px-10 md:py-8 md:pb-10">
+          {children}
+        </main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--color-border)] bg-white/95 px-2 py-2 backdrop-blur md:hidden">
@@ -203,7 +212,7 @@ export function AppShell({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex flex-col items-center gap-1 rounded-xl px-2 py-1.5 text-[10px] font-semibold ${
+                  className={`flex flex-col items-center gap-1 rounded-[var(--radius-md)] px-2 py-1.5 text-[10px] font-semibold ${
                     isActive
                       ? "text-[var(--color-primary)]"
                       : "text-[var(--color-muted-foreground)]"

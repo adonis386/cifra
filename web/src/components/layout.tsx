@@ -12,14 +12,14 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 border-b border-[var(--color-border)] pb-6 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0 space-y-1">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0 space-y-1.5">
         {eyebrow && (
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+          <p className="text-sm font-medium text-[var(--color-muted-foreground)]">
             {eyebrow}
           </p>
         )}
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--color-foreground)] md:text-[1.75rem]">
+        <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--color-foreground)] md:text-[1.85rem]">
           {title}
         </h1>
         {description && (
@@ -46,12 +46,12 @@ export function SectionCard({
 }) {
   return (
     <section
-      className={`rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5 md:p-6 ${className}`}
+      className={`rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-[18px] md:p-5 ${className}`}
     >
       {(title || description) && (
-        <div className="mb-5 space-y-1">
+        <div className="mb-4 space-y-1">
           {title && (
-            <h2 className="text-base font-semibold text-[var(--color-foreground)]">
+            <h2 className="text-sm font-semibold text-[var(--color-foreground)]">
               {title}
             </h2>
           )}
@@ -105,7 +105,7 @@ export function Badge({
     primary: "bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] text-[var(--color-primary)]",
   };
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>
+    <span className={`inline-flex rounded-[var(--radius-md)] px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>
       {children}
     </span>
   );
