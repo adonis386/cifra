@@ -242,6 +242,23 @@ export async function createInvoice(
   if (lineErr) return { error: lineErr };
 
   await tryPostAccounting(invoice.id);
+  try {
+    const { writeAuditLog } = await import("@/lib/actions/audit");
+    await writeAuditLog({
+      companyId: company.id,
+      userId: user?.id,
+      action: "create",
+      entity: "invoice",
+      entityId: invoice.id,
+      payload: {
+        invoice_number: invoiceNumber,
+        move_type: moveType,
+        amount_total: finalTotal,
+      },
+    });
+  } catch {
+    /* ignore */
+  }
   revalidateAll();
   return { success: "Factura registrada." };
 }

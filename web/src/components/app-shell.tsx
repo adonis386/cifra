@@ -17,6 +17,10 @@ import {
   HandCoins,
   Scale,
   BarChart3,
+  ScrollText,
+  Library,
+  ClipboardList,
+  ShieldCheck,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import { Button } from "@/components/ui";
@@ -25,27 +29,32 @@ type Company = { id: string; name: string; rif: string };
 
 const groups = [
   {
-    label: "Operación",
+    label: "Operar",
     items: [
       { href: "/app", label: "Inicio", icon: LayoutDashboard },
       { href: "/app/partners", label: "Terceros", icon: Users },
       { href: "/app/invoices", label: "Facturas", icon: FileText },
-    ],
-  },
-  {
-    label: "Contabilidad",
-    items: [
       { href: "/app/receivables", label: "Por cobrar", icon: CircleDollarSign },
       { href: "/app/payables", label: "Por pagar", icon: HandCoins },
       { href: "/app/payments", label: "Pagos", icon: Wallet },
-      { href: "/app/accounts", label: "Cuentas", icon: Scale },
-      { href: "/app/reports", label: "Reportes", icon: BarChart3 },
     ],
   },
   {
-    label: "Fiscal SENIAT",
+    label: "Libro",
     items: [
-      { href: "/app/books", label: "Libros", icon: BookOpen },
+      { href: "/app/treasury", label: "Caja y bancos", icon: Landmark },
+      { href: "/app/entries", label: "Asientos", icon: ScrollText },
+      { href: "/app/ledger", label: "Mayor", icon: Library },
+      { href: "/app/statements", label: "Estado de cuenta", icon: ClipboardList },
+      { href: "/app/accounts", label: "Plan", icon: Scale },
+      { href: "/app/reports", label: "Reportes", icon: BarChart3 },
+      { href: "/app/audit", label: "Auditoría", icon: ShieldCheck },
+    ],
+  },
+  {
+    label: "Cumplir",
+    items: [
+      { href: "/app/books", label: "Libros fiscales", icon: BookOpen },
       { href: "/app/withholdings", label: "Retenciones", icon: Receipt },
       { href: "/app/municipal", label: "Municipal", icon: Landmark },
     ],
@@ -157,8 +166,8 @@ export function AppShell({
               [
                 "/app",
                 "/app/invoices",
-                "/app/receivables",
-                "/app/payments",
+                "/app/treasury",
+                "/app/statements",
                 "/app/withholdings",
               ].includes(item.href),
             )

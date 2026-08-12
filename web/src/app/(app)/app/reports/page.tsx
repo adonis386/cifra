@@ -1,4 +1,13 @@
 import Link from "next/link";
+import {
+  BarChart3,
+  ClipboardList,
+  Library,
+  Scale,
+  ScrollText,
+  ShieldCheck,
+  Landmark,
+} from "lucide-react";
 import { formatMoney, getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -9,6 +18,45 @@ import {
   Td,
   Th,
 } from "@/components/layout";
+
+const hubs = [
+  {
+    href: "/app/statements",
+    title: "Estado de cuenta",
+    desc: "Reporte de contacto para clientes y proveedores.",
+    icon: ClipboardList,
+  },
+  {
+    href: "/app/ledger",
+    title: "Mayor",
+    desc: "Movimientos y saldo por cuenta.",
+    icon: Library,
+  },
+  {
+    href: "/app/accounts",
+    title: "Balance de comprobación",
+    desc: "Plan VE + saldos debe/haber.",
+    icon: Scale,
+  },
+  {
+    href: "/app/entries",
+    title: "Asientos",
+    desc: "Libro diario y ajustes manuales.",
+    icon: ScrollText,
+  },
+  {
+    href: "/app/treasury",
+    title: "Caja y bancos",
+    desc: "Saldos y extractos de tesorería.",
+    icon: Landmark,
+  },
+  {
+    href: "/app/audit",
+    title: "Auditoría",
+    desc: "Bitácora de cambios.",
+    icon: ShieldCheck,
+  },
+];
 
 export default async function ReportsPage({
   searchParams,
@@ -86,24 +134,49 @@ export default async function ReportsPage({
     });
   }
 
-  let running = 0;
+  const ledgerWithBalance = ledger.reduce<
+    Array<(typeof ledger)[number] & { balance: number }>
+  >((acc, row) => {
+    const prev = acc.length ? acc[acc.length - 1].balance : 0;
+    acc.push({ ...row, balance: prev + row.debit - row.credit });
+    return acc;
+  }, []);
 
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Contabilidad"
+        eyebrow="Libro"
         title="Reportes"
-        description="Resumen CxC/CxP y libro auxiliar de tercero (partner ledger)."
+        description="Centro de lectura Cifra: cobranzas, mayor, estados de cuenta y control. No replica el menú Reportes de Odoo."
       />
 
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {hubs.map((h) => {
+          const Icon = h.icon;
+          return (
+            <Link
+              key={h.href}
+              href={h.href}
+              className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5 shadow-[var(--shadow-sm)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--color-muted)] text-[var(--color-primary)]">
+                <Icon className="h-5 w-5" aria-hidden />
+              </span>
+              <p className="mt-3 font-semibold">{h.title}</p>
+              <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">{h.desc}</p>
+            </Link>
+          );
+        })}
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-3">
-        <SectionCard title="Facturas CxC abiertas">
+        <SectionCard title="CxC abiertas">
           <p className="text-3xl font-bold text-[var(--color-primary)]">{openAr ?? 0}</p>
           <Link href="/app/receivables" className="mt-2 inline-block text-sm font-semibold text-[var(--color-primary)] underline">
             Ver aging
           </Link>
         </SectionCard>
-        <SectionCard title="Facturas CxP abiertas">
+        <SectionCard title="CxP abiertas">
           <p className="text-3xl font-bold text-[var(--color-primary)]">{openAp ?? 0}</p>
           <Link href="/app/payables" className="mt-2 inline-block text-sm font-semibold text-[var(--color-primary)] underline">
             Ver aging
@@ -111,13 +184,19 @@ export default async function ReportsPage({
         </SectionCard>
         <SectionCard title="Pagos recientes">
           <p className="text-3xl font-bold text-[var(--color-primary)]">{recentPayments?.length ?? 0}</p>
-          <Link href="/app/payments" className="mt-2 inline-block text-sm font-semibold text-[var(--color-primary)] underline">
-            Ir a pagos
-          </Link>
+          <div className="mt-2 flex items-center gap-2 text-[var(--color-muted-foreground)]">
+            <BarChart3 className="h-4 w-4" aria-hidden />
+            <Link href="/app/payments" className="text-sm font-semibold text-[var(--color-primary)] underline">
+              Ir a pagos
+            </Link>
+          </div>
         </SectionCard>
       </div>
 
-      <SectionCard title="Libro auxiliar de tercero" description="Movimientos contables del partner seleccionado.">
+      <SectionCard
+        title="Vista rápida de contacto"
+        description="Atajo al estado de cuenta. Para el reporte completo usa Libro → Estado de cuenta."
+      >
         <form className="mb-4 flex flex-wrap items-end gap-3">
           <div className="min-w-[240px] flex-1">
             <label className="mb-1.5 block text-sm font-medium" htmlFor="partner">
@@ -140,8 +219,16 @@ export default async function ReportsPage({
             type="submit"
             className="rounded-[14px] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white"
           >
-            Ver libro
+            Ver
           </button>
+          {partnerId && (
+            <Link
+              href={`/app/statements?partner=${partnerId}`}
+              className="rounded-[14px] border border-[var(--color-border)] px-4 py-2.5 text-sm font-semibold"
+            >
+              Estado completo
+            </Link>
+          )}
         </form>
 
         {ledger.length ? (
@@ -157,19 +244,16 @@ export default async function ReportsPage({
               </tr>
             </thead>
             <tbody>
-              {ledger.map((row, idx) => {
-                running += row.debit - row.credit;
-                return (
+              {ledgerWithBalance.map((row, idx) => (
                   <tr key={`${row.move}-${idx}`}>
                     <Td>{row.move_date}</Td>
                     <Td className="font-mono text-xs">{row.move}</Td>
                     <Td>{row.name || "—"}</Td>
                     <Td className="text-right font-mono text-xs">{formatMoney(row.debit)}</Td>
                     <Td className="text-right font-mono text-xs">{formatMoney(row.credit)}</Td>
-                    <Td className="text-right font-mono text-xs font-semibold">{formatMoney(running)}</Td>
+                    <Td className="text-right font-mono text-xs font-semibold">{formatMoney(row.balance)}</Td>
                   </tr>
-                );
-              })}
+              ))}
             </tbody>
           </DataTable>
         ) : (
