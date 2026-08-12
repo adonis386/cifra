@@ -41,4 +41,13 @@ O pega el contenido de `migrations/ALL.sql` (si existe) de una vez, y luego apli
 - `accountant` — CRUD documentos
 - `viewer` — solo lectura
 
-Storage buckets: `exports`, `logos` (path `{company_id}/...`).
+## Seeds de demo
+
+Para probar reportes con un usuario concreto:
+
+1. Aplica migraciones `00007`, `00008` y (opcional) `00009`
+2. SQL Editor → pega `seeds/seed_demo_reports_user.sql`
+3. Recarga la app
+
+El seed está ligado al user `f97bbcb7-d10b-472c-9fcb-c470ed9e11a9` (usa su empresa o crea `Cifra Demo Seed CA`).
+Datos marcados con `SEED_CIFRA_REPORTS` (re-ejecutable / limpia el seed anterior).
