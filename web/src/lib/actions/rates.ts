@@ -3,8 +3,25 @@
 import { revalidatePath } from "next/cache";
 import { getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+import { fetchBcvUsdRate } from "@/lib/bcv/fetch-usd-rate";
+import { setBcvMemoryCache } from "@/lib/bcv/ensure-rate";
 
-export type ActionState = { error?: string; success?: string };
+export type ActionState = {
+  error?: string;
+  success?: string;
+  rate?: number;
+  rateDate?: string;
+  value?: string;
+};
+
+function revalidateRates() {
+  revalidatePath("/app");
+  revalidatePath("/app/config");
+  revalidatePath("/app/invoices");
+  revalidatePath("/app/payments");
+  revalidatePath("/app/receivables");
+  revalidatePath("/app/payables");
+}
 
 export async function saveExchangeRate(
   _prev: ActionState,
@@ -38,16 +55,58 @@ export async function saveExchangeRate(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/app");
-  revalidatePath("/app/config");
-  revalidatePath("/app/invoices");
-  revalidatePath("/app/payments");
-  revalidatePath("/app/receivables");
-  revalidatePath("/app/payables");
-  return { success: `Tasa ${rate} Bs/USD guardada para ${rateDate}.` };
+  revalidateRates();
+  return {
+    success: `Tasa ${rate} Bs/USD guardada para ${rateDate}.`,
+    rate,
+    rateDate,
+  };
 }
 
-export async function nextControlNumber(): Promise<ActionState & { value?: string }> {
+/** Scrapea https://www.bcv.org.ve/ (#dolar) y guarda la tasa USD. */
+export async function syncBcvExchangeRate(
+  _prev?: ActionState,
+  _formData?: FormData,
+): Promise<ActionState> {
+  const company = await getActiveCompany();
+  if (!company) return { error: "Crea una empresa primero." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  try {
+    const scraped = await fetchBcvUsdRate();
+    const { error } = await supabase.from("exchange_rates").upsert(
+      {
+        company_id: company.id,
+        rate_date: scraped.rateDate,
+        currency_code: "USD",
+        rate: scraped.rate,
+        source: "bcv",
+        created_by: user?.id,
+      },
+      { onConflict: "company_id,rate_date,currency_code" },
+    );
+    if (error) return { error: error.message };
+
+    setBcvMemoryCache(scraped.rate, scraped.rateDate);
+    revalidateRates();
+    return {
+      success: `BCV: ${scraped.rate} Bs/USD (fecha valor ${scraped.rateDate}).`,
+      rate: scraped.rate,
+      rateDate: scraped.rateDate,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error consultando BCV";
+    return { error: msg };
+  }
+}
+
+export async function nextControlNumber(): Promise<
+  ActionState & { value?: string }
+> {
   const company = await getActiveCompany();
   if (!company) return { error: "Crea una empresa primero." };
 
@@ -60,7 +119,6 @@ export async function nextControlNumber(): Promise<ActionState & { value?: strin
   });
 
   if (error) {
-    // Fallback without RPC
     const { data: seq } = await supabase
       .from("sequences")
       .select("id, next_number, prefix, padding")

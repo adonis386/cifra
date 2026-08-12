@@ -6,16 +6,17 @@ import {
   saveTaxUnit,
   type ActionState,
 } from "@/lib/actions/municipal";
-import { saveExchangeRate } from "@/lib/actions/rates";
+import { saveExchangeRate, syncBcvExchangeRate } from "@/lib/actions/rates";
 import { Button, FieldError, Input, Label } from "@/components/ui";
 
 export function ConfigForms({
   latestRate,
 }: {
-  latestRate?: { rate: number; rate_date: string } | null;
+  latestRate?: { rate: number; rate_date: string; source?: string } | null;
 }) {
   const [utState, utAction, utPending] = useActionState(saveTaxUnit, {});
   const [rateState, rateAction, ratePending] = useActionState(saveExchangeRate, {});
+  const [bcvState, bcvAction, bcvPending] = useActionState(syncBcvExchangeRate, {});
   const [cloneState, cloneAction, clonePending] = useActionState(
     async (_prev: ActionState, _formData: FormData) => cloneGlobalCatalogs(),
     {},
@@ -24,41 +25,68 @@ export function ConfigForms({
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
-      <form action={rateAction} className="space-y-3">
-        <h3 className="font-semibold">Tasa del día (USD)</h3>
-        <p className="text-sm text-[var(--color-muted-foreground)]">
-          Bs por 1 USD. Se usa en facturas, saldos y el tablero dual ($ / Bs).
-        </p>
-        {latestRate && (
-          <p className="rounded-[14px] bg-[var(--color-muted)] px-3 py-2 font-mono text-sm">
-            Vigente {latestRate.rate_date}: {latestRate.rate} Bs/USD
+      <div className="space-y-5">
+        <form action={bcvAction} className="space-y-3">
+          <h3 className="font-semibold">Tasa BCV (oficial)</h3>
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            Lee el dólar de{" "}
+            <a
+              href="https://www.bcv.org.ve/"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-[var(--color-primary)] underline-offset-4 hover:underline"
+            >
+              bcv.org.ve
+            </a>{" "}
+            (#dolar) y la guarda como tasa del día. También se actualiza sola al
+            abrir el tablero o facturas si falta.
           </p>
-        )}
-        <div>
-          <Label htmlFor="rate">Tasa Bs / USD</Label>
-          <Input
-            id="rate"
-            name="rate"
-            type="number"
-            step="0.0001"
-            min="0.0001"
-            required
-            defaultValue={latestRate?.rate ?? ""}
-            placeholder="Ej: 36.50"
-          />
-        </div>
-        <div>
-          <Label htmlFor="rate_date">Fecha</Label>
-          <Input id="rate_date" name="rate_date" type="date" required defaultValue={today} />
-        </div>
-        <FieldError message={rateState.error} />
-        {rateState.success && (
-          <p className="text-sm text-[var(--color-accent)]">{rateState.success}</p>
-        )}
-        <Button type="submit" disabled={ratePending}>
-          {ratePending ? "Guardando…" : "Guardar tasa"}
-        </Button>
-      </form>
+          {latestRate && (
+            <p className="rounded-[14px] bg-[var(--color-muted)] px-3 py-2 font-mono text-sm">
+              Vigente {latestRate.rate_date}: {latestRate.rate} Bs/USD
+              {latestRate.source ? ` · ${latestRate.source}` : ""}
+            </p>
+          )}
+          <FieldError message={bcvState.error} />
+          {bcvState.success && (
+            <p className="text-sm text-[var(--color-accent)]">{bcvState.success}</p>
+          )}
+          <Button type="submit" disabled={bcvPending}>
+            {bcvPending ? "Consultando BCV…" : "Actualizar desde BCV"}
+          </Button>
+        </form>
+
+        <form action={rateAction} className="space-y-3 border-t border-[var(--color-border)] pt-5">
+          <h3 className="font-semibold">Carga manual (opcional)</h3>
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            Sobrescribe la tasa si necesitas un valor distinto al BCV.
+          </p>
+          <div>
+            <Label htmlFor="rate">Tasa Bs / USD</Label>
+            <Input
+              id="rate"
+              name="rate"
+              type="number"
+              step="0.0001"
+              min="0.0001"
+              required
+              defaultValue={latestRate?.rate ?? ""}
+              placeholder="Ej: 764.3486"
+            />
+          </div>
+          <div>
+            <Label htmlFor="rate_date">Fecha</Label>
+            <Input id="rate_date" name="rate_date" type="date" required defaultValue={today} />
+          </div>
+          <FieldError message={rateState.error} />
+          {rateState.success && (
+            <p className="text-sm text-[var(--color-accent)]">{rateState.success}</p>
+          )}
+          <Button type="submit" variant="secondary" disabled={ratePending}>
+            {ratePending ? "Guardando…" : "Guardar tasa manual"}
+          </Button>
+        </form>
+      </div>
 
       <form action={utAction} className="space-y-3">
         <h3 className="font-semibold">Nueva Unidad Tributaria</h3>

@@ -127,30 +127,58 @@ export async function getActiveCompany(): Promise<Company | null> {
   return Array.isArray(c) ? c[0] ?? null : c;
 }
 
-/** Última tasa USD (Bs por 1 USD) vigente en o antes de la fecha. */
+/** Última tasa USD (Bs por 1 USD) vigente en o antes de la fecha.
+ * Si no hay tasa para esa fecha, intenta scrapear BCV automáticamente.
+ */
 export async function getExchangeRate(
   companyId: string,
   date: string,
 ): Promise<number | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_exchange_rate", {
-    p_company_id: companyId,
-    p_date: date,
-    p_currency: "USD",
-  });
-  if (!error && data != null) return Number(data);
 
-  // Fallback if RPC not migrated yet
-  const { data: rows } = await supabase
+  async function readDb(): Promise<number | null> {
+    const { data, error } = await supabase.rpc("get_exchange_rate", {
+      p_company_id: companyId,
+      p_date: date,
+      p_currency: "USD",
+    });
+    if (!error && data != null) return Number(data);
+
+    const { data: rows } = await supabase
+      .from("exchange_rates")
+      .select("rate, company_id, rate_date")
+      .eq("currency_code", "USD")
+      .lte("rate_date", date)
+      .or(`company_id.eq.${companyId},company_id.is.null`)
+      .order("rate_date", { ascending: false })
+      .limit(10);
+
+    if (!rows?.length) return null;
+    const companyRow = rows.find((r) => r.company_id === companyId);
+    return Number((companyRow || rows[0]).rate);
+  }
+
+  const existing = await readDb();
+
+  // ¿Hay tasa exactamente para la fecha pedida?
+  const { data: exact } = await supabase
     .from("exchange_rates")
-    .select("rate, company_id, rate_date")
+    .select("rate")
+    .eq("company_id", companyId)
     .eq("currency_code", "USD")
-    .lte("rate_date", date)
-    .or(`company_id.eq.${companyId},company_id.is.null`)
-    .order("rate_date", { ascending: false })
-    .limit(10);
+    .eq("rate_date", date)
+    .maybeSingle();
 
-  if (!rows?.length) return null;
-  const companyRow = rows.find((r) => r.company_id === companyId);
-  return Number((companyRow || rows[0]).rate);
+  if (exact?.rate != null) return Number(exact.rate);
+
+  // Auto-sync BCV cuando falta la tasa del día / fecha valor
+  try {
+    const { ensureBcvRateForCompany } = await import("@/lib/bcv/ensure-rate");
+    const synced = await ensureBcvRateForCompany(companyId, date);
+    if (synced != null) return synced;
+  } catch {
+    /* red / schema / BCV caído → fallback DB */
+  }
+
+  return existing;
 }

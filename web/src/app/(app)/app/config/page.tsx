@@ -50,9 +50,13 @@ export default async function ConfigPage() {
 
   const latest =
     rates?.[0] && rates[0].company_id === company.id
-      ? { rate: Number(rates[0].rate), rate_date: rates[0].rate_date }
+      ? {
+          rate: Number(rates[0].rate),
+          rate_date: rates[0].rate_date,
+          source: String(rates[0].source || ""),
+        }
       : rateToday
-        ? { rate: rateToday, rate_date: today }
+        ? { rate: rateToday, rate_date: today, source: "vigente" }
         : null;
 
   return (
@@ -65,7 +69,7 @@ export default async function ConfigPage() {
 
       <SectionCard
         title="Parámetros"
-        description="Tasa del día, UT y copia del catálogo global a tu empresa."
+        description="Tasa BCV automática, UT y catálogo ISLR."
       >
         <ConfigForms latestRate={latest} />
       </SectionCard>
