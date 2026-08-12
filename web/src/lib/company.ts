@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 export type Company = {
@@ -8,6 +9,8 @@ export type Company = {
   currency_code?: string;
   dual_currency?: boolean;
 };
+
+export const ACTIVE_COMPANY_COOKIE = "cifra_active_company";
 
 export function normalizeRif(rif: string) {
   // Quita guiones, puntos, espacios y cualquier separador. Guarda V123456789.
@@ -102,29 +105,72 @@ export async function requireUser() {
   return { supabase, user };
 }
 
-export async function getActiveCompany(): Promise<Company | null> {
-  const { supabase, user } = await requireUser();
-  const primary = await supabase
-    .from("company_members")
-    .select("companies(id, name, rif, is_withholding_agent, currency_code, dual_currency)")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+export async function setActiveCompanyCookie(companyId: string) {
+  const cookieStore = await cookies();
+  cookieStore.set(ACTIVE_COMPANY_COOKIE, companyId, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 365,
+    secure: process.env.NODE_ENV === "production",
+  });
+}
 
-  let rawCompanies: unknown = primary.data?.companies;
-  if (primary.error && /currency_code|dual_currency|column/i.test(primary.error.message)) {
+function unwrapCompany(raw: unknown): Company | null {
+  if (!raw) return null;
+  const c = Array.isArray(raw) ? raw[0] : raw;
+  if (!c || typeof c !== "object" || !("id" in c)) return null;
+  return c as Company;
+}
+
+/** Todas las empresas del usuario (membresías). */
+export async function getUserCompanies(): Promise<Company[]> {
+  const { supabase, user } = await requireUser();
+
+  const full = await supabase
+    .from("company_members")
+    .select(
+      "created_at, companies(id, name, rif, is_withholding_agent, currency_code, dual_currency)",
+    )
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
+
+  let rows: { companies?: unknown }[] | null = full.data;
+  if (
+    full.error &&
+    /currency_code|dual_currency|column|created_at/i.test(full.error.message)
+  ) {
     const fallback = await supabase
       .from("company_members")
       .select("companies(id, name, rif, is_withholding_agent)")
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-    rawCompanies = fallback.data?.companies;
+      .eq("user_id", user.id);
+    rows = fallback.data;
   }
 
-  const c = rawCompanies as Company | Company[] | null;
-  if (!c) return null;
-  return Array.isArray(c) ? c[0] ?? null : c;
+  const companies: Company[] = [];
+  const seen = new Set<string>();
+  for (const row of rows || []) {
+    const c = unwrapCompany(row.companies);
+    if (c && !seen.has(c.id)) {
+      seen.add(c.id);
+      companies.push(c);
+    }
+  }
+  return companies;
+}
+
+export async function getActiveCompany(): Promise<Company | null> {
+  const companies = await getUserCompanies();
+  if (!companies.length) return null;
+
+  const cookieStore = await cookies();
+  const preferred = cookieStore.get(ACTIVE_COMPANY_COOKIE)?.value;
+  if (preferred) {
+    const match = companies.find((c) => c.id === preferred);
+    if (match) return match;
+  }
+
+  return companies[0];
 }
 
 /** Última tasa USD (Bs por 1 USD) vigente en o antes de la fecha.
