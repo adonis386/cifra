@@ -39,8 +39,9 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute =
     path.startsWith("/login") || path.startsWith("/signup");
   const isAppRoute = path.startsWith("/app");
+  const isPrintRoute = path.startsWith("/print");
 
-  if (!isAuthenticated && isAppRoute) {
+  if (!isAuthenticated && (isAppRoute || isPrintRoute)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);

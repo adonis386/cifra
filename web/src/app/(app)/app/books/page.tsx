@@ -84,7 +84,25 @@ export default async function BooksPage({
           </div>
         </SectionCard>
 
-        <SectionCard title="Detalle del libro">
+        <SectionCard
+          title="Detalle del libro"
+          description={
+            selectedId
+              ? "Vista en pantalla. Usa Imprimir/PDF para el formato SENIAT."
+              : undefined
+          }
+        >
+          {selectedId && (lines || []).length > 0 && (
+            <div className="mb-4">
+              <Link
+                href={`/print/book/${selectedId}`}
+                target="_blank"
+                className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+              >
+                Imprimir / PDF del libro
+              </Link>
+            </div>
+          )}
           {(lines || []).length ? (
             <DataTable>
               <thead>

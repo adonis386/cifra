@@ -105,6 +105,7 @@ export default async function WithholdingsPage() {
                   <Th>Período</Th>
                   <Th>Sujeto</Th>
                   <Th className="text-right">Monto</Th>
+                  <Th></Th>
                 </tr>
               </thead>
               <tbody>
@@ -125,6 +126,15 @@ export default async function WithholdingsPage() {
                       <Td className="text-right font-mono text-xs font-semibold">
                         {formatMoney(w.amount_withheld)}
                       </Td>
+                      <Td>
+                        <Link
+                          href={`/print/iva/${w.id}`}
+                          className="text-xs font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+                          target="_blank"
+                        >
+                          PDF
+                        </Link>
+                      </Td>
                     </tr>
                   );
                 })}
@@ -144,6 +154,7 @@ export default async function WithholdingsPage() {
                   <Th>Período</Th>
                   <Th>Sujeto</Th>
                   <Th className="text-right">Monto</Th>
+                  <Th></Th>
                 </tr>
               </thead>
               <tbody>
@@ -165,6 +176,15 @@ export default async function WithholdingsPage() {
                       </Td>
                       <Td className="text-right font-mono text-xs font-semibold">
                         {formatMoney(w.amount_withheld)}
+                      </Td>
+                      <Td>
+                        <Link
+                          href={`/print/islr/${w.id}`}
+                          className="text-xs font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+                          target="_blank"
+                        >
+                          PDF
+                        </Link>
                       </Td>
                     </tr>
                   );
