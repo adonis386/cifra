@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #1e3a5f;
+  --color-primary-soft: #2a4a73;
+  --color-on-primary: #ffffff;
+  --color-secondary: #0f766e;
+  --color-accent: #059669;
+  --color-background: #f4f6f9;
+  --color-foreground: #0f172a;
+  --color-muted: #eef2f6;
+  --color-muted-foreground: #64748b;
+  --color-border: #e6ebf0;
+  --color-destructive: #dc2626;
+  --color-ring: #1e3a5f;
+  --color-surface: #ffffff;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+@theme inline {
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-foreground);
+  --color-primary: var(--color-primary);
+  --color-accent: var(--color-accent);
+  --color-muted: var(--color-muted);
+  --color-border: var(--color-border);
+  --color-destructive: var(--color-destructive);
+  --font-sans: var(--font-plus-jakarta);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-plus-jakarta), system-ui, sans-serif;
+}
+
+a,
+button,
+[role="button"] {
+  cursor: pointer;
+}

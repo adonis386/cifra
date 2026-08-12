@@ -12,3 +12,8 @@ dist/
 Thumbs.db
 *.log
 .vercel
+
+# Cursor agent local assets
+web/.cursor/
+web/design-system/
+
