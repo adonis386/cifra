@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   updateCompanyBranding,
   type BrandingState,
@@ -24,10 +25,37 @@ type CompanyBranding = {
 const initial: BrandingState = {};
 
 export function BrandingForm({ company }: { company: CompanyBranding }) {
+  const router = useRouter();
   const [state, action, pending] = useActionState(updateCompanyBranding, initial);
+  const [preview, setPreview] = useState<string | null>(company.logo_url);
+  const [localFileUrl, setLocalFileUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPreview(company.logo_url);
+  }, [company.logo_url]);
+
+  useEffect(() => {
+    if (!state.success && !state.error) return;
+    if (state.logo_url) {
+      setPreview(state.logo_url);
+      setLocalFileUrl(null);
+    } else if (state.logo_path === null) {
+      setPreview(null);
+      setLocalFileUrl(null);
+    }
+    router.refresh();
+  }, [state.logo_url, state.logo_path, state.success, state.error, router]);
+
+  useEffect(() => {
+    return () => {
+      if (localFileUrl) URL.revokeObjectURL(localFileUrl);
+    };
+  }, [localFileUrl]);
+
+  const shown = localFileUrl || preview;
 
   return (
-    <form action={action} className="space-y-4" encType="multipart/form-data">
+    <form action={action} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Label htmlFor="name">Razón social</Label>
@@ -78,11 +106,11 @@ export function BrandingForm({ company }: { company: CompanyBranding }) {
       <div className="border-t border-[var(--color-border)] pt-4">
         <h3 className="mb-3 text-sm font-semibold">Membrete PDF</h3>
         <div className="mb-4 flex items-center gap-4">
-          {company.logo_url ? (
+          {shown ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={company.logo_url}
-              alt="Logo actual"
+              src={shown}
+              alt="Logo"
               className="h-16 w-16 rounded-[var(--radius-md)] border border-[var(--color-border)] object-contain bg-white"
             />
           ) : (
@@ -90,9 +118,41 @@ export function BrandingForm({ company }: { company: CompanyBranding }) {
               Sin logo
             </div>
           )}
-          <div className="flex-1">
-            <Label htmlFor="logo">Logo (PNG/JPG/WEBP, máx. 2 MB)</Label>
-            <Input id="logo" name="logo" type="file" accept="image/*" />
+          <div className="flex-1 space-y-2">
+            <div>
+              <Label htmlFor="logo">Logo (PNG/JPG/WEBP, máx. 2 MB)</Label>
+              <Input
+                id="logo"
+                name="logo"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (localFileUrl) URL.revokeObjectURL(localFileUrl);
+                  if (file) {
+                    setLocalFileUrl(URL.createObjectURL(file));
+                  } else {
+                    setLocalFileUrl(null);
+                  }
+                }}
+              />
+              <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+                Ruta en Supabase: bucket <code>logos</code> →{" "}
+                <code>{`{empresa_id}/logo.ext`}</code>
+                {(state.logo_path ?? company.logo_path) ? (
+                  <>
+                    <br />
+                    Actual: <code>{state.logo_path ?? company.logo_path}</code>
+                  </>
+                ) : null}
+              </p>
+            </div>
+            {(state.logo_path ?? company.logo_path) ? (
+              <label className="flex items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
+                <input type="checkbox" name="remove_logo" className="h-3.5 w-3.5" />
+                Quitar logo actual
+              </label>
+            ) : null}
           </div>
         </div>
         <label className="mb-4 flex items-center gap-2 text-sm">

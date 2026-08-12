@@ -75,7 +75,7 @@ export default async function ConfigPage() {
 
       <SectionCard
         title="Empresa y membrete"
-        description="Nombre, correo, logo y pie de página en facturas y reportes PDF. Esencial para venta por licencia multi-empresa."
+        description="Nombre, correo, logo (Supabase Storage bucket logos/{empresa}/logo.ext) y pie en facturas y reportes PDF."
       >
         {branding ? (
           <BrandingForm company={branding} />

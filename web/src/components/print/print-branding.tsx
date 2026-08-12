@@ -22,12 +22,17 @@ export function PrintLetterhead({
                 <img
                   src={company.logo_url}
                   alt=""
+                  width={64}
+                  height={64}
                   style={{
                     width: 64,
                     height: 64,
                     objectFit: "contain",
                     border: "1px solid #e2e8f0",
                     background: "#fff",
+                  }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
                   }}
                 />
               ) : null}
