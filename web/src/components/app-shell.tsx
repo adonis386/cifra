@@ -22,6 +22,7 @@ import {
   ClipboardList,
   ShieldCheck,
 } from "lucide-react";
+import { CompanySwitcher } from "@/components/company-switcher";
 import { signOut } from "@/lib/actions/auth";
 import { Button } from "@/components/ui";
 
@@ -162,14 +163,10 @@ export function AppShell({
           <div className="min-w-0 md:hidden">
             <p className="text-lg font-bold tracking-tight">Cifra</p>
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">
-              {active ? active.name : "Sin empresa"}
-            </p>
-            <p className="truncate font-mono text-xs text-[var(--color-muted-foreground)]">
-              {active ? active.rif : "Crea tu primera empresa"}
-            </p>
-          </div>
+          <CompanySwitcher
+            companies={companies}
+            activeCompanyId={activeCompanyId || active?.id}
+          />
           <div className="flex items-center gap-3">
             <span className="hidden max-w-[180px] truncate text-xs text-[var(--color-muted-foreground)] sm:inline">
               {email}

@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { validateRif } from "@/lib/company";
+import { setActiveCompanyCookie, validateRif } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 
 export type CompanyValues = {
@@ -67,5 +67,6 @@ export async function createCompany(
     return { error: error.message, values };
   }
 
-  redirect(`/app?company=${data.id}`);
+  await setActiveCompanyCookie(data.id);
+  redirect("/app");
 }

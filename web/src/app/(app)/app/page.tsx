@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney, getExchangeRate } from "@/lib/company";
+import { formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
 import { Button } from "@/components/ui";
 import { PageHeader } from "@/components/layout";
 
@@ -40,34 +40,11 @@ function docStateLabel(state: string | null | undefined) {
 }
 
 export default async function AppHomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: memberships } = await supabase
-    .from("company_members")
-    .select("company_id, companies(id, name, rif)")
-    .eq("user_id", user!.id);
-
-  const companies =
-    memberships
-      ?.map((m) => {
-        const c = m.companies as
-          | { id: string; name: string; rif: string }
-          | { id: string; name: string; rif: string }[]
-          | null;
-        if (!c) return null;
-        return Array.isArray(c) ? c[0] : c;
-      })
-      .filter(Boolean) || [];
-
-  const company = companies[0] as
-    | { id: string; name: string; rif: string }
-    | undefined;
+  const company = await getActiveCompany();
   const hasCompany = Boolean(company);
   const today = new Date().toISOString().slice(0, 10);
-  const greeting = greetingForHour(new Date().getUTCHours() - 4); // VE approx
+  const greeting = greetingForHour(new Date().getUTCHours() - 4);
+  const supabase = await createClient();
 
   const [
     rate,
