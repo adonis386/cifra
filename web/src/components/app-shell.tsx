@@ -12,6 +12,11 @@ import {
   Settings2,
   Landmark,
   Users,
+  Wallet,
+  CircleDollarSign,
+  HandCoins,
+  Scale,
+  BarChart3,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import { Button } from "@/components/ui";
@@ -25,6 +30,16 @@ const groups = [
       { href: "/app", label: "Inicio", icon: LayoutDashboard },
       { href: "/app/partners", label: "Terceros", icon: Users },
       { href: "/app/invoices", label: "Facturas", icon: FileText },
+    ],
+  },
+  {
+    label: "Contabilidad",
+    items: [
+      { href: "/app/receivables", label: "Por cobrar", icon: CircleDollarSign },
+      { href: "/app/payables", label: "Por pagar", icon: HandCoins },
+      { href: "/app/payments", label: "Pagos", icon: Wallet },
+      { href: "/app/accounts", label: "Cuentas", icon: Scale },
+      { href: "/app/reports", label: "Reportes", icon: BarChart3 },
     ],
   },
   {
@@ -139,9 +154,13 @@ export function AppShell({
           {groups
             .flatMap((g) => g.items)
             .filter((item) =>
-              ["/app", "/app/invoices", "/app/withholdings", "/app/books", "/app/config"].includes(
-                item.href,
-              ),
+              [
+                "/app",
+                "/app/invoices",
+                "/app/receivables",
+                "/app/payments",
+                "/app/withholdings",
+              ].includes(item.href),
             )
             .map((item) => {
               const Icon = item.icon;

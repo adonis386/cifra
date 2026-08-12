@@ -3,11 +3,9 @@ import {
   BookOpen,
   FileDown,
   FileText,
-  Landmark,
   Plus,
   Receipt,
   Settings2,
-  Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui";
@@ -21,34 +19,34 @@ const quickActions = [
     tone: "bg-[#e8f1ff] text-[#1e3a5f]",
   },
   {
-    href: "/app/books",
-    label: "Libros",
+    href: "/app/receivables",
+    label: "Por cobrar",
+    icon: Receipt,
+    tone: "bg-[#ecfdf5] text-[#047857]",
+  },
+  {
+    href: "/app/payables",
+    label: "Por pagar",
     icon: BookOpen,
-    tone: "bg-[#e8f8f1] text-[#059669]",
+    tone: "bg-[#fff4e8] text-[#c2410c]",
+  },
+  {
+    href: "/app/payments",
+    label: "Pagos",
+    icon: FileDown,
+    tone: "bg-[#eef6ff] text-[#1d4ed8]",
   },
   {
     href: "/app/withholdings",
     label: "Retenciones",
     icon: FileDown,
-    tone: "bg-[#fff4e8] text-[#c2410c]",
-  },
-  {
-    href: "/app/municipal",
-    label: "Municipal",
-    icon: Landmark,
-    tone: "bg-[#eef6ff] text-[#1d4ed8]",
-  },
-  {
-    href: "/app/partners",
-    label: "Terceros",
-    icon: Users,
     tone: "bg-[#f3f4f6] text-[#374151]",
   },
   {
-    href: "/app/config",
-    label: "Config",
+    href: "/app/reports",
+    label: "Reportes",
     icon: Settings2,
-    tone: "bg-[#ecfdf5] text-[#047857]",
+    tone: "bg-[#f8fafc] text-[#0f172a]",
   },
 ];
 

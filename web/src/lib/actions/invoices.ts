@@ -79,6 +79,8 @@ export async function createInvoice(
     data: { user },
   } = await supabase.auth.getUser();
 
+  const residual = Number((finalTotal - finalRetained).toFixed(2));
+
   const { data: invoice, error } = await supabase
     .from("invoices")
     .insert({
@@ -89,6 +91,7 @@ export async function createInvoice(
       doc_type: doc,
       state: "confirmed",
       invoice_date: invoiceDate,
+      due_date: invoiceDate,
       invoice_number: invoiceNumber,
       control_number: controlNumber || null,
       affected_document: affectedDocument || null,
@@ -97,6 +100,9 @@ export async function createInvoice(
       amount_exempt: finalExempt,
       amount_total: finalTotal,
       amount_retained_iva: finalRetained,
+      amount_residual: residual,
+      amount_paid: 0,
+      payment_state: residual <= 0 ? "paid" : "not_paid",
       created_by: user?.id,
     })
     .select("id")
@@ -124,7 +130,18 @@ export async function createInvoice(
   );
   if (lineErr) return { error: lineErr.message };
 
+  // Post accounting entry (Odoo account.move) — ignore soft failures if migration pending
+  try {
+    const { postInvoiceAccounting } = await import("@/lib/actions/accounting");
+    await postInvoiceAccounting(invoice.id);
+  } catch {
+    /* schema may not be migrated yet */
+  }
+
   revalidatePath("/app/invoices");
+  revalidatePath("/app/receivables");
+  revalidatePath("/app/payables");
+  revalidatePath("/app/accounts");
   revalidatePath("/app");
   return { success: "Factura registrada." };
 }
