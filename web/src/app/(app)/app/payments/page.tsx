@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PaymentForm } from "@/components/payments/payment-form";
-import { formatMoney, getActiveCompany } from "@/lib/company";
+import { ReportExportActions } from "@/components/report-export-actions";
+import { formatDual, formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
   Badge,
@@ -26,7 +27,8 @@ export default async function PaymentsPage() {
   }
 
   const supabase = await createClient();
-  const [{ data: partners }, { data: journals }, { data: openInvoices }, { data: payments }] =
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ data: partners }, { data: journals }, { data: openInvoices }, { data: payments }, rate] =
     await Promise.all([
       supabase.from("partners").select("id, name, rif").eq("company_id", company.id).order("name"),
       supabase
@@ -44,11 +46,12 @@ export default async function PaymentsPage() {
       supabase
         .from("payments")
         .select(
-          "id, payment_type, payment_date, amount, reference, memo, state, partners(name, rif)",
+          "id, payment_type, payment_date, amount, exchange_rate, amount_usd, reference, memo, state, partners(name, rif)",
         )
         .eq("company_id", company.id)
         .order("payment_date", { ascending: false })
         .limit(50),
+      getExchangeRate(company.id, today),
     ]);
 
   const invoiceOptions = (openInvoices || []).map((inv) => ({
@@ -64,12 +67,14 @@ export default async function PaymentsPage() {
         eyebrow="Contabilidad"
         title="Pagos y cobros"
         description="Registro de account.payment con aplicación a facturas abiertas (FIFO o factura específica)."
+        actions={<ReportExportActions xlsxHref="/api/export/payments" />}
       />
       <SectionCard title="Registrar" description="Inbound = cobro clientes · Outbound = pago proveedores.">
         <PaymentForm
           partners={partners || []}
           journals={journals || []}
           invoices={invoiceOptions}
+          initialRate={rate || 0}
         />
       </SectionCard>
       <SectionCard title="Últimos movimientos">
@@ -91,13 +96,12 @@ export default async function PaymentsPage() {
                   | { name: string; rif: string }[]
                   | null;
                 const pr = Array.isArray(partner) ? partner[0] : partner;
+                const payRate = Number(p.exchange_rate || rate || 0) || null;
                 return (
                   <tr key={p.id}>
                     <Td>{p.payment_date}</Td>
                     <Td>
-                      <Badge tone={p.payment_type === "inbound" ? "success" : "warning"}>
-                        {p.payment_type === "inbound" ? "Cobro" : "Pago"}
-                      </Badge>
+                      <Badge>{p.payment_type === "inbound" ? "Cobro" : "Pago"}</Badge>
                     </Td>
                     <Td>
                       <div className="font-medium">{pr?.name}</div>
@@ -105,9 +109,11 @@ export default async function PaymentsPage() {
                         {pr?.rif}
                       </div>
                     </Td>
-                    <Td className="text-xs">{p.reference || p.memo || "—"}</Td>
-                    <Td className="text-right font-mono text-xs font-semibold">
-                      {formatMoney(p.amount)}
+                    <Td className="text-xs text-[var(--color-muted-foreground)]">
+                      {p.reference || p.memo || "—"}
+                    </Td>
+                    <Td className="text-right font-mono text-xs">
+                      {payRate ? formatDual(p.amount, payRate) : formatMoney(p.amount)}
                     </Td>
                   </tr>
                 );
@@ -115,7 +121,7 @@ export default async function PaymentsPage() {
             </tbody>
           </DataTable>
         ) : (
-          <EmptyState title="Sin pagos" description="Registra el primero arriba." />
+          <EmptyState title="Sin pagos" />
         )}
       </SectionCard>
     </div>

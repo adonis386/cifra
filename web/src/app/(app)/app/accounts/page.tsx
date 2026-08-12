@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ensureCompanyAccountingForm } from "@/lib/actions/accounting";
+import { ReportExportActions } from "@/components/report-export-actions";
 import { formatMoney, getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui";
@@ -69,15 +70,21 @@ export default async function AccountsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Contabilidad"
+        eyebrow="Libro"
         title="Plan de cuentas"
-        description="account.account + account.journal + asientos (account.move), inspirado en Odoo Accounting."
+        description="Catálogo VE de Cifra (activo, pasivo, ingreso, gasto) y orígenes de asiento. El balance de comprobación vive aquí."
         actions={
-          <form action={ensureCompanyAccountingForm}>
-            <Button type="submit" variant="secondary">
-              Regenerar plan VE
-            </Button>
-          </form>
+          <div className="flex flex-wrap items-center gap-3">
+            <ReportExportActions
+              pdfHref="/print/trial-balance"
+              xlsxHref="/api/export/trial-balance"
+            />
+            <form action={ensureCompanyAccountingForm}>
+              <Button type="submit" variant="secondary">
+                Regenerar plan VE
+              </Button>
+            </form>
+          </div>
         }
       />
 
@@ -110,7 +117,7 @@ export default async function AccountsPage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Diarios">
+        <SectionCard title="Orígenes">
           {(journals || []).length ? (
             <DataTable>
               <thead>
@@ -136,7 +143,7 @@ export default async function AccountsPage() {
         </SectionCard>
       </div>
 
-      <SectionCard title="Balance de comprobación (lite)">
+      <SectionCard title="Balance de comprobación">
         {trial.length ? (
           <DataTable>
             <thead>
@@ -167,7 +174,7 @@ export default async function AccountsPage() {
         )}
       </SectionCard>
 
-      <SectionCard title="Últimos asientos">
+      <SectionCard title="Últimos asientos" description="Ver el libro completo en Asientos.">
         {(moves || []).length ? (
           <DataTable>
             <thead>

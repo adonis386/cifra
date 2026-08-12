@@ -9,14 +9,14 @@ export function Button({
   variant?: "primary" | "secondary" | "ghost" | "soft";
 }) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
+    "inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-4 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
   const variants = {
     primary:
-      "bg-[var(--color-accent)] text-white shadow-[var(--shadow-sm)] hover:opacity-95 hover:-translate-y-px",
+      "bg-[var(--color-primary)] text-white shadow-[var(--shadow-sm)] hover:bg-[var(--color-primary-soft)]",
     secondary:
-      "border border-[var(--color-primary)]/20 text-[var(--color-primary)] bg-white hover:bg-[var(--color-muted)]",
+      "border border-[var(--color-border)] text-[var(--color-foreground)] bg-white hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]",
     soft:
-      "bg-[var(--color-muted)] text-[var(--color-primary)] hover:bg-[color-mix(in_srgb,var(--color-primary)_10%,white)]",
+      "bg-[var(--brand-accent-muted)] text-[var(--color-primary)] hover:bg-[color-mix(in_srgb,var(--color-primary)_14%,white)]",
     ghost:
       "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]",
   };
@@ -34,7 +34,7 @@ export function Input({
 }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-[14px] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm text-[var(--color-foreground)] transition-[border-color,box-shadow] duration-200 placeholder:text-[var(--color-muted-foreground)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-[3px] focus:ring-[color-mix(in_srgb,var(--color-primary)_18%,transparent)] ${className}`}
+      className={`w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm text-[var(--color-foreground)] transition-[border-color,box-shadow] duration-300 placeholder:text-[var(--color-muted-foreground)] focus:border-[var(--brand-accent)] focus:outline-none focus:ring-[3px] focus:ring-[color-mix(in_srgb,var(--brand-accent)_18%,transparent)] ${className}`}
       {...props}
     />
   );

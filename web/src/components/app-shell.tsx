@@ -17,6 +17,10 @@ import {
   HandCoins,
   Scale,
   BarChart3,
+  ScrollText,
+  Library,
+  ClipboardList,
+  ShieldCheck,
 } from "lucide-react";
 import { signOut } from "@/lib/actions/auth";
 import { Button } from "@/components/ui";
@@ -25,27 +29,32 @@ type Company = { id: string; name: string; rif: string };
 
 const groups = [
   {
-    label: "Operación",
+    label: "Operar",
     items: [
       { href: "/app", label: "Inicio", icon: LayoutDashboard },
       { href: "/app/partners", label: "Terceros", icon: Users },
       { href: "/app/invoices", label: "Facturas", icon: FileText },
-    ],
-  },
-  {
-    label: "Contabilidad",
-    items: [
       { href: "/app/receivables", label: "Por cobrar", icon: CircleDollarSign },
       { href: "/app/payables", label: "Por pagar", icon: HandCoins },
       { href: "/app/payments", label: "Pagos", icon: Wallet },
-      { href: "/app/accounts", label: "Cuentas", icon: Scale },
-      { href: "/app/reports", label: "Reportes", icon: BarChart3 },
     ],
   },
   {
-    label: "Fiscal SENIAT",
+    label: "Libro",
     items: [
-      { href: "/app/books", label: "Libros", icon: BookOpen },
+      { href: "/app/treasury", label: "Caja y bancos", icon: Landmark },
+      { href: "/app/entries", label: "Asientos", icon: ScrollText },
+      { href: "/app/ledger", label: "Mayor", icon: Library },
+      { href: "/app/statements", label: "Estado de cuenta", icon: ClipboardList },
+      { href: "/app/accounts", label: "Plan", icon: Scale },
+      { href: "/app/reports", label: "Reportes", icon: BarChart3 },
+      { href: "/app/audit", label: "Auditoría", icon: ShieldCheck },
+    ],
+  },
+  {
+    label: "Cumplir",
+    items: [
+      { href: "/app/books", label: "Libros fiscales", icon: BookOpen },
       { href: "/app/withholdings", label: "Retenciones", icon: Receipt },
       { href: "/app/municipal", label: "Municipal", icon: Landmark },
     ],
@@ -74,16 +83,20 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-[var(--color-background)] text-[var(--color-foreground)]">
       <div className="mx-auto flex min-h-screen max-w-[1440px] gap-4 p-3 md:p-4">
-        <aside className="hidden w-64 shrink-0 rounded-[var(--radius-lg)] bg-[var(--color-surface)] px-3 py-5 shadow-[var(--shadow-sm)] md:flex md:flex-col">
+        <aside className="hidden w-64 shrink-0 flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-5 shadow-[var(--shadow-sm)] md:flex">
           <div className="mb-6 px-3">
-            <p className="text-lg font-bold tracking-tight text-[var(--color-primary)]">Cifra</p>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Contabilidad Venezuela</p>
+            <p className="text-lg font-bold tracking-tight text-[var(--color-foreground)]">
+              Cifra
+            </p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">
+              Contabilidad Venezuela
+            </p>
           </div>
 
           <nav className="flex flex-1 flex-col gap-5 overflow-y-auto">
             {groups.map((group) => (
               <div key={group.label}>
-                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">
+                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
                   {group.label}
                 </p>
                 <div className="space-y-1">
@@ -97,7 +110,7 @@ export function AppShell({
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`flex items-center gap-2.5 rounded-[14px] px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                        className={`flex items-center gap-2.5 rounded-[var(--radius-md)] px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${
                           isActive
                             ? "bg-[var(--color-primary)] text-white shadow-[var(--shadow-sm)]"
                             : "text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]"
@@ -113,18 +126,36 @@ export function AppShell({
             ))}
           </nav>
 
-          <form action={signOut} className="mt-auto px-1 pt-4">
-            <Button type="submit" variant="ghost" className="w-full justify-start">
-              <LogOut className="h-4 w-4" aria-hidden />
-              Salir
-            </Button>
-          </form>
+          <div className="mt-auto space-y-3 border-t border-[var(--color-border)] px-1 pt-4">
+            <p className="px-2 text-[10px] text-[var(--color-muted-foreground)]">
+              Desarrollado por{" "}
+              <a
+                href="https://www.informaticagonzalez.com"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-[var(--color-primary)] hover:underline"
+              >
+                Informática González
+              </a>
+            </p>
+            <form action={signOut}>
+              <Button type="submit" variant="ghost" className="w-full justify-start">
+                <LogOut className="h-4 w-4" aria-hidden />
+                Salir
+              </Button>
+            </form>
+          </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <header className="flex items-center justify-between gap-4 rounded-[var(--radius-lg)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-sm)] md:px-6">
+          <header className="flex items-center justify-between gap-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-sm)] md:px-6">
+            <div className="min-w-0 md:hidden">
+              <p className="text-base font-bold tracking-tight">Cifra</p>
+            </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{active ? active.name : "Sin empresa"}</p>
+              <p className="truncate text-sm font-semibold">
+                {active ? active.name : "Sin empresa"}
+              </p>
               <p className="truncate font-mono text-xs text-[var(--color-muted-foreground)]">
                 {active ? active.rif : "Crea tu primera empresa"}
               </p>
@@ -135,7 +166,7 @@ export function AppShell({
               </span>
               <Link
                 href="/app/empresa/nueva"
-                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--color-primary)_12%,white)]"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-muted)] px-3 py-2 text-xs font-semibold text-[var(--color-primary)] transition-colors duration-200 hover:bg-[var(--brand-accent-muted)]"
               >
                 <Building2 className="h-3.5 w-3.5" aria-hidden />
                 Nueva empresa
@@ -143,7 +174,7 @@ export function AppShell({
             </div>
           </header>
 
-          <main className="flex-1 rounded-[var(--radius-lg)] bg-[var(--color-surface)] px-4 py-6 pb-24 shadow-[var(--shadow-sm)] md:px-8 md:py-8 md:pb-8">
+          <main className="flex-1 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-6 pb-24 shadow-[var(--shadow-sm)] md:px-8 md:py-8 md:pb-8">
             {children}
           </main>
         </div>
@@ -157,8 +188,8 @@ export function AppShell({
               [
                 "/app",
                 "/app/invoices",
-                "/app/receivables",
-                "/app/payments",
+                "/app/treasury",
+                "/app/statements",
                 "/app/withholdings",
               ].includes(item.href),
             )

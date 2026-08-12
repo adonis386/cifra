@@ -6,6 +6,24 @@ import { createClient } from "@/lib/supabase/server";
 
 export type ActionState = { error?: string; success?: string };
 
+type BookInvoice = {
+  id: string;
+  invoice_date: string;
+  invoice_number: string;
+  control_number: string | null;
+  doc_type: string;
+  amount_untaxed: number;
+  amount_tax: number;
+  amount_exempt: number;
+  amount_total: number;
+  amount_retained_iva: number;
+  sin_cred?: boolean;
+  partners:
+    | { name: string; rif: string }
+    | { name: string; rif: string }[]
+    | null;
+};
+
 export async function generateFiscalBook(
   _prev: ActionState,
   formData: FormData,
@@ -33,19 +51,44 @@ export async function generateFiscalBook(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: invoices, error: invErr } = await supabase
-    .from("invoices")
-    .select(
-      "id, invoice_date, invoice_number, control_number, doc_type, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva, partners(name, rif)",
-    )
-    .eq("company_id", company.id)
-    .in("move_type", moveTypes)
-    .gte("invoice_date", periodStart)
-    .lte("invoice_date", periodEnd)
-    .neq("state", "cancelled")
-    .order("invoice_date", { ascending: true });
+  let invoices: BookInvoice[] | null = null;
+  let invErr: { message: string } | null = null;
+
+  {
+    const res = await supabase
+      .from("invoices")
+      .select(
+        "id, invoice_date, invoice_number, control_number, doc_type, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva, sin_cred, partners(name, rif)",
+      )
+      .eq("company_id", company.id)
+      .in("move_type", moveTypes)
+      .gte("invoice_date", periodStart)
+      .lte("invoice_date", periodEnd)
+      .neq("state", "cancelled")
+      .eq("sin_cred", false)
+      .order("invoice_date", { ascending: true });
+    invoices = res.data as BookInvoice[] | null;
+    invErr = res.error;
+  }
+
+  if (invErr && /sin_cred|column/i.test(invErr.message)) {
+    const res = await supabase
+      .from("invoices")
+      .select(
+        "id, invoice_date, invoice_number, control_number, doc_type, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva, partners(name, rif)",
+      )
+      .eq("company_id", company.id)
+      .in("move_type", moveTypes)
+      .gte("invoice_date", periodStart)
+      .lte("invoice_date", periodEnd)
+      .neq("state", "cancelled")
+      .order("invoice_date", { ascending: true });
+    invoices = res.data as BookInvoice[] | null;
+    invErr = res.error;
+  }
 
   if (invErr) return { error: invErr.message };
+  invoices = (invoices || []).filter((inv) => !inv.sin_cred);
 
   const label =
     bookType === "sale" ? "Libro de Ventas" : "Libro de Compras";
@@ -67,11 +110,8 @@ export async function generateFiscalBook(
 
   if (bookErr) return { error: bookErr.message };
 
-  const lines = (invoices || []).map((inv, idx) => {
-    const partner = inv.partners as unknown as
-      | { name: string; rif: string }
-      | { name: string; rif: string }[]
-      | null;
+  const lines = invoices.map((inv, idx) => {
+    const partner = inv.partners;
     const p = Array.isArray(partner) ? partner[0] : partner;
     return {
       book_id: book.id,
@@ -100,7 +140,5 @@ export async function generateFiscalBook(
   }
 
   revalidatePath("/app/books");
-  return {
-    success: `Libro generado con ${lines.length} documento(s).`,
-  };
+  return { success: `Libro generado con ${lines.length} líneas.` };
 }

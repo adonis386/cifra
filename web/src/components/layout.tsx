@@ -19,7 +19,7 @@ export function PageHeader({
             {eyebrow}
           </p>
         )}
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--color-primary)] md:text-[1.75rem]">
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--color-foreground)] md:text-[1.75rem]">
           {title}
         </h1>
         {description && (
@@ -46,11 +46,15 @@ export function SectionCard({
 }) {
   return (
     <section
-      className={`rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5 shadow-[var(--shadow-sm)] md:p-6 ${className}`}
+      className={`rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5 md:p-6 ${className}`}
     >
       {(title || description) && (
         <div className="mb-5 space-y-1">
-          {title && <h2 className="text-base font-semibold text-[var(--color-foreground)]">{title}</h2>}
+          {title && (
+            <h2 className="text-base font-semibold text-[var(--color-foreground)]">
+              {title}
+            </h2>
+          )}
           {description && (
             <p className="text-sm text-[var(--color-muted-foreground)]">{description}</p>
           )}
@@ -68,7 +72,7 @@ export function Select({
 }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`w-full rounded-[14px] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm text-[var(--color-foreground)] transition-[border-color,box-shadow] duration-200 focus:border-[var(--color-primary)] focus:outline-none focus:ring-[3px] focus:ring-[color-mix(in_srgb,var(--color-primary)_18%,transparent)] ${className}`}
+      className={`w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm text-[var(--color-foreground)] transition-[border-color,box-shadow] duration-300 focus:border-[var(--brand-accent)] focus:outline-none focus:ring-[3px] focus:ring-[color-mix(in_srgb,var(--brand-accent)_18%,transparent)] ${className}`}
       {...props}
     >
       {children}

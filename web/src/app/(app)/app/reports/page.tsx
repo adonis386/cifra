@@ -1,4 +1,14 @@
 import Link from "next/link";
+import {
+  BarChart3,
+  ClipboardList,
+  Library,
+  Scale,
+  ScrollText,
+  ShieldCheck,
+  Landmark,
+} from "lucide-react";
+import { ReportExportActions } from "@/components/report-export-actions";
 import { formatMoney, getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -9,6 +19,72 @@ import {
   Td,
   Th,
 } from "@/components/layout";
+
+const hubs: Array<{
+  href: string;
+  title: string;
+  desc: string;
+  icon: typeof BarChart3;
+  pdf?: string;
+  xlsx?: string;
+}> = [
+  {
+    href: "/app/receivables",
+    title: "Cuentas por cobrar",
+    desc: "Aging de clientes · PDF y Excel.",
+    icon: BarChart3,
+    pdf: "/print/receivables",
+    xlsx: "/api/export/receivables",
+  },
+  {
+    href: "/app/payables",
+    title: "Cuentas por pagar",
+    desc: "Aging de proveedores · PDF y Excel.",
+    icon: BarChart3,
+    pdf: "/print/payables",
+    xlsx: "/api/export/payables",
+  },
+  {
+    href: "/app/statements",
+    title: "Estado de cuenta",
+    desc: "Reporte de contacto · PDF y Excel.",
+    icon: ClipboardList,
+  },
+  {
+    href: "/app/ledger",
+    title: "Mayor",
+    desc: "Movimientos por cuenta · PDF y Excel.",
+    icon: Library,
+  },
+  {
+    href: "/app/accounts",
+    title: "Balance de comprobación",
+    desc: "Saldos debe/haber · PDF y Excel.",
+    icon: Scale,
+    pdf: "/print/trial-balance",
+    xlsx: "/api/export/trial-balance",
+  },
+  {
+    href: "/app/books",
+    title: "Libros fiscales",
+    desc: "Compras/ventas SENIAT · PDF y Excel.",
+    icon: ScrollText,
+  },
+  {
+    href: "/app/invoices",
+    title: "Facturas",
+    desc: "Listado + impresión unitaria · Excel.",
+    icon: Landmark,
+    xlsx: "/api/export/invoices",
+  },
+  {
+    href: "/app/payments",
+    title: "Pagos y cobros",
+    desc: "Tesorería aplicada · Excel.",
+    icon: ShieldCheck,
+    xlsx: "/api/export/payments",
+  },
+];
 
 export default async function ReportsPage({
   searchParams,
@@ -86,24 +162,55 @@ export default async function ReportsPage({
     });
   }
 
-  let running = 0;
+  const ledgerWithBalance = ledger.reduce<
+    Array<(typeof ledger)[number] & { balance: number }>
+  >((acc, row) => {
+    const prev = acc.length ? acc[acc.length - 1].balance : 0;
+    acc.push({ ...row, balance: prev + row.debit - row.credit });
+    return acc;
+  }, []);
 
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Contabilidad"
+        eyebrow="Libro"
         title="Reportes"
-        description="Resumen CxC/CxP y libro auxiliar de tercero (partner ledger)."
+        description="Centro de lectura Cifra: cobranzas, mayor, estados de cuenta y control. No replica el menú Reportes de Odoo."
       />
 
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {hubs.map((h) => {
+          const Icon = h.icon;
+          return (
+            <div
+              key={h.href}
+              className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5 shadow-[var(--shadow-sm)]"
+            >
+              <Link href={h.href} className="block transition-opacity hover:opacity-90">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--color-muted)] text-[var(--color-primary)]">
+                  <Icon className="h-5 w-5" aria-hidden />
+                </span>
+                <p className="mt-3 font-semibold">{h.title}</p>
+                <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">{h.desc}</p>
+              </Link>
+              {(h.pdf || h.xlsx) && (
+                <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+                  <ReportExportActions pdfHref={h.pdf} xlsxHref={h.xlsx} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-3">
-        <SectionCard title="Facturas CxC abiertas">
+        <SectionCard title="CxC abiertas">
           <p className="text-3xl font-bold text-[var(--color-primary)]">{openAr ?? 0}</p>
           <Link href="/app/receivables" className="mt-2 inline-block text-sm font-semibold text-[var(--color-primary)] underline">
             Ver aging
           </Link>
         </SectionCard>
-        <SectionCard title="Facturas CxP abiertas">
+        <SectionCard title="CxP abiertas">
           <p className="text-3xl font-bold text-[var(--color-primary)]">{openAp ?? 0}</p>
           <Link href="/app/payables" className="mt-2 inline-block text-sm font-semibold text-[var(--color-primary)] underline">
             Ver aging
@@ -111,13 +218,19 @@ export default async function ReportsPage({
         </SectionCard>
         <SectionCard title="Pagos recientes">
           <p className="text-3xl font-bold text-[var(--color-primary)]">{recentPayments?.length ?? 0}</p>
-          <Link href="/app/payments" className="mt-2 inline-block text-sm font-semibold text-[var(--color-primary)] underline">
-            Ir a pagos
-          </Link>
+          <div className="mt-2 flex items-center gap-2 text-[var(--color-muted-foreground)]">
+            <BarChart3 className="h-4 w-4" aria-hidden />
+            <Link href="/app/payments" className="text-sm font-semibold text-[var(--color-primary)] underline">
+              Ir a pagos
+            </Link>
+          </div>
         </SectionCard>
       </div>
 
-      <SectionCard title="Libro auxiliar de tercero" description="Movimientos contables del partner seleccionado.">
+      <SectionCard
+        title="Vista rápida de contacto"
+        description="Atajo al estado de cuenta. Para el reporte completo usa Libro → Estado de cuenta."
+      >
         <form className="mb-4 flex flex-wrap items-end gap-3">
           <div className="min-w-[240px] flex-1">
             <label className="mb-1.5 block text-sm font-medium" htmlFor="partner">
@@ -127,7 +240,7 @@ export default async function ReportsPage({
               id="partner"
               name="partner"
               defaultValue={partnerId}
-              className="w-full rounded-[14px] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
             >
               {(partners || []).map((p) => (
                 <option key={p.id} value={p.id}>
@@ -138,10 +251,18 @@ export default async function ReportsPage({
           </div>
           <button
             type="submit"
-            className="rounded-[14px] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+            className="rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white"
           >
-            Ver libro
+            Ver
           </button>
+          {partnerId && (
+            <Link
+              href={`/app/statements?partner=${partnerId}`}
+              className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2.5 text-sm font-semibold"
+            >
+              Estado completo
+            </Link>
+          )}
         </form>
 
         {ledger.length ? (
@@ -157,19 +278,16 @@ export default async function ReportsPage({
               </tr>
             </thead>
             <tbody>
-              {ledger.map((row, idx) => {
-                running += row.debit - row.credit;
-                return (
+              {ledgerWithBalance.map((row, idx) => (
                   <tr key={`${row.move}-${idx}`}>
                     <Td>{row.move_date}</Td>
                     <Td className="font-mono text-xs">{row.move}</Td>
                     <Td>{row.name || "—"}</Td>
                     <Td className="text-right font-mono text-xs">{formatMoney(row.debit)}</Td>
                     <Td className="text-right font-mono text-xs">{formatMoney(row.credit)}</Td>
-                    <Td className="text-right font-mono text-xs font-semibold">{formatMoney(running)}</Td>
+                    <Td className="text-right font-mono text-xs font-semibold">{formatMoney(row.balance)}</Td>
                   </tr>
-                );
-              })}
+              ))}
             </tbody>
           </DataTable>
         ) : (
