@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ConfigForms } from "@/components/config/config-forms";
-import { getActiveCompany } from "@/lib/company";
+import { formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
   DataTable,
@@ -25,36 +25,80 @@ export default async function ConfigPage() {
   }
 
   const supabase = await createClient();
-  const [{ data: units }, { data: concepts }] = await Promise.all([
-    supabase
-      .from("tax_units")
-      .select("id, name, amount, date_from, company_id")
-      .or(`company_id.eq.${company.id},company_id.is.null`)
-      .order("date_from", { ascending: false }),
-    supabase
-      .from("islr_concepts")
-      .select("id, code, name, company_id")
-      .or(`company_id.eq.${company.id},company_id.is.null`)
-      .order("code")
-      .limit(30),
-  ]);
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ data: units }, { data: concepts }, { data: rates }, rateToday] =
+    await Promise.all([
+      supabase
+        .from("tax_units")
+        .select("id, name, amount, date_from, company_id")
+        .or(`company_id.eq.${company.id},company_id.is.null`)
+        .order("date_from", { ascending: false }),
+      supabase
+        .from("islr_concepts")
+        .select("id, code, name, company_id")
+        .or(`company_id.eq.${company.id},company_id.is.null`)
+        .order("code")
+        .limit(30),
+      supabase
+        .from("exchange_rates")
+        .select("id, rate_date, rate, source, company_id")
+        .or(`company_id.eq.${company.id},company_id.is.null`)
+        .order("rate_date", { ascending: false })
+        .limit(12),
+      getExchangeRate(company.id, today),
+    ]);
+
+  const latest =
+    rates?.[0] && rates[0].company_id === company.id
+      ? { rate: Number(rates[0].rate), rate_date: rates[0].rate_date }
+      : rateToday
+        ? { rate: rateToday, rate_date: today }
+        : null;
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Sistema"
         title="Configuración fiscal"
-        description="Unidad tributaria y catálogo ISLR (conceptos/tarifas de l10n_ve_full)."
+        description="Tasa USD/Bs, unidad tributaria y catálogo ISLR (l10n_ve_full)."
       />
 
       <SectionCard
         title="Parámetros"
-        description="Actualiza UT y copia el catálogo global a tu empresa."
+        description="Tasa del día, UT y copia del catálogo global a tu empresa."
       >
-        <ConfigForms />
+        <ConfigForms latestRate={latest} />
       </SectionCard>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
+        <SectionCard title="Historial de tasas">
+          {(rates || []).length ? (
+            <DataTable>
+              <thead>
+                <tr>
+                  <Th>Fecha</Th>
+                  <Th className="text-right">Bs/USD</Th>
+                  <Th>Ámbito</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {(rates || []).map((r) => (
+                  <tr key={r.id}>
+                    <Td>{r.rate_date}</Td>
+                    <Td className="text-right font-mono text-xs">{formatMoney(r.rate)}</Td>
+                    <Td>{r.company_id ? "Empresa" : "Global"}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
+          ) : (
+            <EmptyState
+              title="Sin tasas"
+              description="Aplica la migración 08 y registra la tasa del día."
+            />
+          )}
+        </SectionCard>
+
         <SectionCard title="Unidades tributarias">
           {(units || []).length ? (
             <DataTable>
@@ -63,7 +107,6 @@ export default async function ConfigPage() {
                   <Th>Nombre</Th>
                   <Th>Desde</Th>
                   <Th className="text-right">Monto</Th>
-                  <Th>Ámbito</Th>
                 </tr>
               </thead>
               <tbody>
@@ -72,7 +115,6 @@ export default async function ConfigPage() {
                     <Td>{u.name}</Td>
                     <Td>{u.date_from}</Td>
                     <Td className="text-right font-mono text-xs">{Number(u.amount).toFixed(4)}</Td>
-                    <Td>{u.company_id ? "Empresa" : "Global"}</Td>
                   </tr>
                 ))}
               </tbody>
@@ -89,15 +131,13 @@ export default async function ConfigPage() {
                 <tr>
                   <Th>Código</Th>
                   <Th>Nombre</Th>
-                  <Th>Ámbito</Th>
                 </tr>
               </thead>
               <tbody>
                 {(concepts || []).map((c) => (
                   <tr key={c.id}>
                     <Td className="font-mono text-xs">{c.code}</Td>
-                    <Td className="max-w-[240px] truncate">{c.name}</Td>
-                    <Td>{c.company_id ? "Empresa" : "Global"}</Td>
+                    <Td className="max-w-[180px] truncate">{c.name}</Td>
                   </tr>
                 ))}
               </tbody>

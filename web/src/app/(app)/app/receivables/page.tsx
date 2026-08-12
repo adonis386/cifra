@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatMoney, getActiveCompany } from "@/lib/company";
+import { formatDual, formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
   Badge,
@@ -37,16 +37,20 @@ export default async function ReceivablesPage() {
 
   const supabase = await createClient();
   const today = new Date();
-  const { data: invoices } = await supabase
-    .from("invoices")
-    .select(
-      "id, invoice_date, due_date, invoice_number, amount_total, amount_residual, payment_state, partners(name, rif)",
-    )
-    .eq("company_id", company.id)
-    .in("move_type", ["out_invoice", "out_refund"])
-    .gt("amount_residual", 0)
-    .neq("state", "cancelled")
-    .order("invoice_date");
+  const todayIso = today.toISOString().slice(0, 10);
+  const [{ data: invoices }, rate] = await Promise.all([
+    supabase
+      .from("invoices")
+      .select(
+        "id, invoice_date, due_date, invoice_number, amount_total, amount_residual, exchange_rate, payment_state, partners(name, rif)",
+      )
+      .eq("company_id", company.id)
+      .in("move_type", ["out_invoice", "out_refund"])
+      .gt("amount_residual", 0)
+      .neq("state", "cancelled")
+      .order("invoice_date"),
+    getExchangeRate(company.id, todayIso),
+  ]);
 
   const buckets: Record<string, number> = {
     current: 0,
@@ -62,12 +66,17 @@ export default async function ReceivablesPage() {
     buckets[agingBucket(inv.due_date || inv.invoice_date, today)] += r;
   }
 
+  const dual = (n: number, invRate?: number | null) => {
+    const r = Number(invRate || rate || 0) || null;
+    return r ? formatDual(n, r) : formatMoney(n);
+  };
+
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Contabilidad"
         title="Cuentas por cobrar"
-        description="Saldos de clientes (asset_receivable) y antigüedad estilo Odoo partner aging."
+        description="Saldos de clientes y antigüedad estilo Odoo, con dual $ / Bs."
         actions={
           <Link
             href="/app/payments"
@@ -89,7 +98,7 @@ export default async function ReceivablesPage() {
         ].map((s) => (
           <SectionCard key={s.label}>
             <p className="text-xs text-[var(--color-muted-foreground)]">{s.label}</p>
-            <p className="mt-1 font-mono text-lg font-semibold">{formatMoney(s.value)}</p>
+            <p className="mt-1 font-mono text-sm font-semibold">{dual(s.value)}</p>
           </SectionCard>
         ))}
       </div>
@@ -130,9 +139,11 @@ export default async function ReceivablesPage() {
                         {bucket}
                       </Badge>
                     </Td>
-                    <Td className="text-right font-mono text-xs">{formatMoney(inv.amount_total)}</Td>
+                    <Td className="text-right font-mono text-xs">
+                      {dual(Number(inv.amount_total), inv.exchange_rate)}
+                    </Td>
                     <Td className="text-right font-mono text-xs font-semibold">
-                      {formatMoney(inv.amount_residual)}
+                      {dual(Number(inv.amount_residual), inv.exchange_rate)}
                     </Td>
                   </tr>
                 );

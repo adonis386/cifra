@@ -238,6 +238,11 @@ export async function registerPayment(
   const reference = String(formData.get("reference") || "").trim();
   const journalId = String(formData.get("journal_id") || "") || null;
   const invoiceId = String(formData.get("invoice_id") || "") || null;
+  const exchangeRate = Number(formData.get("exchange_rate") || 0) || null;
+  const amountUsd =
+    exchangeRate && exchangeRate > 0
+      ? Number((amount / exchangeRate).toFixed(2))
+      : null;
 
   if (!partnerId || !paymentDate || amount <= 0) {
     return { error: "Completa tercero, fecha y monto." };
@@ -276,23 +281,53 @@ export async function registerPayment(
     return { error: "No hay facturas abiertas para ese tercero." };
   }
 
-  const { data: payment, error: payErr } = await supabase
-    .from("payments")
-    .insert({
-      company_id: company.id,
-      partner_id: partnerId,
-      journal_id: journalId,
-      payment_type: paymentType,
-      payment_date: paymentDate,
-      amount,
-      memo: memo || null,
-      reference: reference || null,
-      state: "posted",
-      created_by: user?.id,
-    })
-    .select("id")
-    .single();
-  if (payErr) return { error: payErr.message };
+  let paymentId: string | null = null;
+  {
+    const { data: payment, error: payErr } = await supabase
+      .from("payments")
+      .insert({
+        company_id: company.id,
+        partner_id: partnerId,
+        journal_id: journalId,
+        payment_type: paymentType,
+        payment_date: paymentDate,
+        amount,
+        exchange_rate: exchangeRate,
+        amount_usd: amountUsd,
+        memo: memo || null,
+        reference: reference || null,
+        state: "posted",
+        created_by: user?.id,
+      })
+      .select("id")
+      .single();
+
+    if (!payErr && payment) {
+      paymentId = payment.id;
+    } else if (payErr && /exchange_rate|amount_usd|column/i.test(payErr.message)) {
+      const { data: legacyPay, error: legacyErr } = await supabase
+        .from("payments")
+        .insert({
+          company_id: company.id,
+          partner_id: partnerId,
+          journal_id: journalId,
+          payment_type: paymentType,
+          payment_date: paymentDate,
+          amount,
+          memo: memo || null,
+          reference: reference || null,
+          state: "posted",
+          created_by: user?.id,
+        })
+        .select("id")
+        .single();
+      if (legacyErr) return { error: legacyErr.message };
+      paymentId = legacyPay.id;
+    } else if (payErr) {
+      return { error: payErr.message };
+    }
+  }
+  if (!paymentId) return { error: "No se pudo registrar el pago." };
 
   let remaining = amount;
   const allocations: Array<{
@@ -308,7 +343,7 @@ export async function registerPayment(
     const apply = Math.min(due, remaining);
     if (apply <= 0) continue;
     allocations.push({
-      payment_id: payment.id,
+      payment_id: paymentId,
       company_id: company.id,
       invoice_id: inv.id,
       amount: Number(apply.toFixed(2)),
@@ -368,7 +403,7 @@ export async function registerPayment(
         move_date: paymentDate,
         state: "posted",
         partner_id: partnerId,
-        payment_id: payment.id,
+        payment_id: paymentId,
         created_by: user?.id,
       })
       .select("id")
@@ -420,7 +455,7 @@ export async function registerPayment(
               },
             ];
       await supabase.from("account_move_lines").insert(lines);
-      await supabase.from("payments").update({ move_id: move.id }).eq("id", payment.id);
+      await supabase.from("payments").update({ move_id: move.id }).eq("id", paymentId);
     }
   }
 

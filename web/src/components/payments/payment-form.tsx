@@ -21,11 +21,13 @@ export function PaymentForm({
   journals,
   invoices,
   defaultType = "inbound",
+  initialRate = 0,
 }: {
   partners: Partner[];
   journals: Journal[];
   invoices: InvoiceOption[];
   defaultType?: "inbound" | "outbound";
+  initialRate?: number;
 }) {
   const [state, action, pending] = useActionState(registerPayment, initial);
   const [paymentType, setPaymentType] = useState<"inbound" | "outbound">(defaultType);
@@ -84,8 +86,21 @@ export function PaymentForm({
         <Input id="payment_date" name="payment_date" type="date" required defaultValue={today} />
       </div>
       <div>
-        <Label htmlFor="amount">Monto</Label>
+        <Label htmlFor="amount">Monto (Bs)</Label>
         <Input id="amount" name="amount" type="number" step="0.01" min="0.01" required defaultValue="0" />
+      </div>
+      <div>
+        <Label htmlFor="exchange_rate">Tasa Bs/USD (opcional)</Label>
+        <Input
+          id="exchange_rate"
+          name="exchange_rate"
+          type="number"
+          step="0.0001"
+          min="0"
+          className="font-mono"
+          placeholder="Para dual $ / Bs"
+          defaultValue={initialRate > 0 ? String(initialRate) : ""}
+        />
       </div>
       <div>
         <Label htmlFor="journal_id">Diario</Label>
