@@ -46,8 +46,20 @@ O pega el contenido de `migrations/ALL.sql` (si existe) de una vez, y luego apli
 Para probar reportes con un usuario concreto:
 
 1. Aplica migraciones `00007`, `00008` y (opcional) `00009`
-2. SQL Editor → pega `seeds/seed_demo_reports_user.sql`
+2. SQL Editor → pega `seeds/seed_demo_reports_user.sql` → **Run**
 3. Recarga la app
 
 El seed está ligado al user `f97bbcb7-d10b-472c-9fcb-c470ed9e11a9` (usa su empresa o crea `Cifra Demo Seed CA`).
 Datos marcados con `SEED_CIFRA_REPORTS` (re-ejecutable / limpia el seed anterior).
+
+### Qué genera
+
+| Dato | Cantidad | Para probar |
+|------|----------|-------------|
+| Clientes / proveedores | 4 | Estado de cuenta, CxC/CxP |
+| Facturas (abierta / parcial / pagada / aging) | 6 | Aging, residuales, dual `$/Bs` |
+| Pagos + asientos | 3 | Tesorería, mayor, aplicaciones |
+| Retenciones IVA | 2 | Cumplir → retenciones |
+| Libros fiscales | 2 | Libro compras/ventas |
+| Extracto banco | 1 | Caja y bancos (si `00009`) |
+| Asiento de apertura | 1 | Mayor / balance |
