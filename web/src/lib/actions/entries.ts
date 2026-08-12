@@ -93,7 +93,7 @@ export async function createManualEntry(
       name: moveName,
       ref: ref || null,
       move_date: moveDate,
-      state: "posted",
+      state: "confirmed",
       notes: notes || null,
       created_by: user?.id,
     })

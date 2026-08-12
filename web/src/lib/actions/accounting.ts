@@ -113,7 +113,7 @@ export async function postInvoiceAccounting(invoiceId: string): Promise<ActionSt
       name: moveName,
       ref: inv.control_number || inv.invoice_number,
       move_date: inv.invoice_date,
-      state: "posted",
+      state: "confirmed",
       partner_id: inv.partner_id,
       invoice_id: inv.id,
       created_by: user?.id,
@@ -296,7 +296,7 @@ export async function registerPayment(
         amount_usd: amountUsd,
         memo: memo || null,
         reference: reference || null,
-        state: "posted",
+        state: "confirmed",
         created_by: user?.id,
       })
       .select("id")
@@ -316,7 +316,7 @@ export async function registerPayment(
           amount,
           memo: memo || null,
           reference: reference || null,
-          state: "posted",
+          state: "confirmed",
           created_by: user?.id,
         })
         .select("id")
@@ -401,7 +401,7 @@ export async function registerPayment(
         name: `PAY/${paymentDate.replace(/-/g, "")}/${String(Date.now()).slice(-4)}`,
         ref: reference || memo || null,
         move_date: paymentDate,
-        state: "posted",
+        state: "confirmed",
         partner_id: partnerId,
         payment_id: paymentId,
         created_by: user?.id,
