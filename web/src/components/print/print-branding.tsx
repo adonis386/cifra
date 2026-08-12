@@ -31,9 +31,6 @@ export function PrintLetterhead({
                     border: "1px solid #e2e8f0",
                     background: "#fff",
                   }}
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
                 />
               ) : null}
               <div>

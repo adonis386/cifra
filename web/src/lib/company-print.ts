@@ -112,23 +112,27 @@ async function resolveLogoUrl(
   // 1) URL pública (bucket logos público)
   const pub = publicLogoUrl(logoPath, cacheKey);
   if (pub) {
-    // Verificar que el objeto exista; si falla, intentar signed
     try {
-      const head = await fetch(pub, { method: "HEAD", cache: "no-store" });
+      const ctrl = AbortSignal.timeout(2500);
+      const head = await fetch(pub, { method: "HEAD", cache: "no-store", signal: ctrl });
       if (head.ok) return pub;
     } catch {
-      /* red / CORS HEAD — seguimos a signed */
+      /* timeout / red — seguimos a signed */
     }
   }
 
   // 2) Signed URL (bucket privado o HEAD falló)
   const clean = logoPath.replace(/^\/+/, "");
   if (!/^https?:\/\//i.test(clean)) {
-    const { data: signed, error } = await supabase.storage
-      .from("logos")
-      .createSignedUrl(clean, 60 * 60 * 12);
-    if (!error && signed?.signedUrl) {
-      return withCacheBust(signed.signedUrl, cacheKey);
+    try {
+      const { data: signed, error } = await supabase.storage
+        .from("logos")
+        .createSignedUrl(clean, 60 * 60 * 12);
+      if (!error && signed?.signedUrl) {
+        return withCacheBust(signed.signedUrl, cacheKey);
+      }
+    } catch {
+      /* storage no disponible */
     }
   }
 
