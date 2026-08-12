@@ -80,7 +80,7 @@ export function MunicipalForms({ partners }: { partners: Partner[] }) {
         {txt && (
           <div className="space-y-2">
             <textarea
-              className="h-40 w-full rounded-[14px] border border-[var(--color-border)] bg-[var(--color-muted)] p-3 font-mono text-xs"
+              className="h-40 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-muted)] p-3 font-mono text-xs"
               readOnly
               value={txt}
             />

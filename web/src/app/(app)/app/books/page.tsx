@@ -66,7 +66,7 @@ export default async function BooksPage({
               <Link
                 key={b.id}
                 href={`/app/books?id=${b.id}`}
-                className={`block rounded-[14px] border px-3 py-3 text-sm transition-colors duration-200 ${
+                className={`block rounded-[var(--radius-md)] border px-3 py-3 text-sm transition-colors duration-200 ${
                   b.id === selectedId
                     ? "border-[var(--color-primary)] bg-[var(--color-muted)]"
                     : "border-[var(--color-border)] hover:bg-[var(--color-muted)]"

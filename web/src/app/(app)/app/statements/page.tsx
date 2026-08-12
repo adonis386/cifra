@@ -157,7 +157,7 @@ export default async function StatementsPage({
               id="partner"
               name="partner"
               defaultValue={partnerId}
-              className="w-full rounded-[14px] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
             >
               {(partners || []).map((p) => (
                 <option key={p.id} value={p.id}>
@@ -175,7 +175,7 @@ export default async function StatementsPage({
               name="from"
               type="date"
               defaultValue={from}
-              className="w-full rounded-[14px] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
             />
           </div>
           <div>
@@ -187,13 +187,13 @@ export default async function StatementsPage({
               name="to"
               type="date"
               defaultValue={to}
-              className="w-full rounded-[14px] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
             />
           </div>
           <div className="md:col-span-4">
             <button
               type="submit"
-              className="rounded-[14px] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+              className="rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white"
             >
               Generar estado
             </button>
@@ -203,7 +203,7 @@ export default async function StatementsPage({
 
       {partner && (
         <>
-          <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-soft)] px-6 py-5 text-white">
+          <section className="border border-[var(--brand-border)] bg-[var(--brand-bg)] px-6 py-5 text-white">
             <p className="text-sm text-white/70">Estado de cuenta</p>
             <h2 className="mt-1 text-xl font-bold">{partner.name}</h2>
             <p className="font-mono text-sm text-white/80">{partner.rif}</p>

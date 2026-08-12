@@ -24,37 +24,37 @@ const quickActions = [
     href: "/app/invoices",
     label: "Facturas",
     icon: FileText,
-    tone: "bg-[#e8f1ff] text-[#1e3a5f]",
+    tone: "bg-[var(--brand-accent-muted)] text-[var(--brand-accent)]",
   },
   {
     href: "/app/receivables",
     label: "Por cobrar",
     icon: Receipt,
-    tone: "bg-[#ecfdf5] text-[#047857]",
+    tone: "bg-[var(--brand-accent-muted)] text-[var(--brand-accent)]",
   },
   {
     href: "/app/payables",
     label: "Por pagar",
     icon: BookOpen,
-    tone: "bg-[#fff4e8] text-[#c2410c]",
+    tone: "bg-neutral-100 text-neutral-800",
   },
   {
     href: "/app/payments",
     label: "Pagos",
     icon: FileDown,
-    tone: "bg-[#eef6ff] text-[#1d4ed8]",
+    tone: "bg-[var(--brand-accent-muted)] text-[var(--brand-accent-hover)]",
   },
   {
     href: "/app/withholdings",
     label: "Retenciones",
     icon: FileDown,
-    tone: "bg-[#f3f4f6] text-[#374151]",
+    tone: "bg-neutral-100 text-neutral-700",
   },
   {
     href: "/app/reports",
     label: "Reportes",
     icon: Settings2,
-    tone: "bg-[#f8fafc] text-[#0f172a]",
+    tone: "bg-neutral-100 text-[var(--brand-bg)]",
   },
 ];
 
@@ -187,12 +187,12 @@ export default async function AppHomePage() {
             : "Nueva transacción";
       const accent =
         j.journal_type === "bank"
-          ? "from-[#1e3a5f] to-[#2d4a6f]"
+          ? "from-[#2563eb] to-[#1d4ed8]"
           : j.journal_type === "cash"
-            ? "from-[#0f766e] to-[#0d9488]"
+            ? "from-[#0a0a0a] to-[#262626]"
             : j.journal_type === "sale"
-              ? "from-[#047857] to-[#059669]"
-              : "from-[#c2410c] to-[#ea580c]";
+              ? "from-[#2563eb] to-[#1e40af]"
+              : "from-[#171717] to-[#404040]";
       return {
         id: j.id,
         code: j.code,
@@ -239,9 +239,9 @@ export default async function AppHomePage() {
         <section className="space-y-3">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold">Diarios</h2>
+              <h2 className="font-display text-sm font-semibold tracking-tight">Operación</h2>
               <p className="text-xs text-[var(--color-muted-foreground)]">
-                Vista tipo Odoo Accounting: bancos, cajas y pendientes.
+                Caja, bancos y pendientes de cobro/pago.
               </p>
             </div>
             <Link
@@ -265,7 +265,7 @@ export default async function AppHomePage() {
                     <h3 className="mt-1 text-base font-semibold">{card.name}</h3>
                   </div>
                   <span
-                    className={`flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br ${card.accent} text-white`}
+                    className={`flex h-9 w-9 items-center justify-center bg-gradient-to-br ${card.accent} text-white`}
                   >
                     {card.journal_type === "bank" || card.journal_type === "cash" ? (
                       <Wallet className="h-4 w-4" aria-hidden />
@@ -300,7 +300,7 @@ export default async function AppHomePage() {
 
                 <Link
                   href={card.href}
-                  className={`mt-4 inline-flex items-center justify-center rounded-[14px] bg-gradient-to-r ${card.accent} px-3 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-95`}
+                  className={`mt-4 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-gradient-to-r ${card.accent} px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-white transition-opacity hover:opacity-95`}
                 >
                   {card.cta}
                 </Link>
@@ -311,8 +311,8 @@ export default async function AppHomePage() {
       )}
 
       {hasCompany && (
-        <section className="overflow-hidden rounded-[var(--radius-xl)] bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-soft)] px-6 py-7 text-white shadow-[var(--shadow-md)] md:px-8">
-          <p className="text-sm text-white/70">Indicadores</p>
+        <section className="overflow-hidden border border-[var(--brand-border)] bg-[var(--brand-bg)] px-6 py-7 text-white md:px-8">
+          <p className="label-brand text-white/50">Indicadores</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {[
               { label: "Terceros", value: partnerCount ?? 0 },
@@ -321,10 +321,10 @@ export default async function AppHomePage() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-[18px] bg-white/10 px-4 py-3 backdrop-blur-sm"
+                className="border border-white/10 bg-white/5 px-4 py-3"
               >
-                <p className="text-xs text-white/70">{stat.label}</p>
-                <p className="mt-1 text-2xl font-bold tracking-tight">{stat.value}</p>
+                <p className="text-xs uppercase tracking-wider text-white/50">{stat.label}</p>
+                <p className="mt-1 font-display text-2xl font-semibold tracking-tight">{stat.value}</p>
               </div>
             ))}
           </div>

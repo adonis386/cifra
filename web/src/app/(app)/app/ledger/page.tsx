@@ -120,7 +120,7 @@ export default async function LedgerPage({
               id="account"
               name="account"
               defaultValue={accountId}
-              className="w-full rounded-[14px] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
             >
               {(accounts || []).map((a) => (
                 <option key={a.id} value={a.id}>
@@ -138,7 +138,7 @@ export default async function LedgerPage({
               name="from"
               type="date"
               defaultValue={from}
-              className="w-full rounded-[14px] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
             />
           </div>
           <div>
@@ -150,13 +150,13 @@ export default async function LedgerPage({
               name="to"
               type="date"
               defaultValue={to}
-              className="w-full rounded-[14px] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
             />
           </div>
           <div className="md:col-span-4">
             <button
               type="submit"
-              className="rounded-[14px] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+              className="rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white"
             >
               Ver mayor
             </button>

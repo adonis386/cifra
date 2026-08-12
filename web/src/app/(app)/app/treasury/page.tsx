@@ -153,7 +153,7 @@ export default async function TreasuryPage() {
               return (
                 <div
                   key={st.id}
-                  className="rounded-[14px] border border-[var(--color-border)] p-4"
+                  className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-4"
                 >
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                     <div>

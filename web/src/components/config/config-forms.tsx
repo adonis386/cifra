@@ -42,7 +42,7 @@ export function ConfigForms({
             abrir el tablero o facturas si falta.
           </p>
           {latestRate && (
-            <p className="rounded-[14px] bg-[var(--color-muted)] px-3 py-2 font-mono text-sm">
+            <p className="rounded-[var(--radius-md)] bg-[var(--color-muted)] px-3 py-2 font-mono text-sm">
               Vigente {latestRate.rate_date}: {latestRate.rate} Bs/USD
               {latestRate.source ? ` · ${latestRate.source}` : ""}
             </p>

@@ -140,7 +140,7 @@ export function ManualEntryForm({
         {lines.map((line) => (
           <div
             key={line.id}
-            className="grid gap-2 rounded-[14px] border border-[var(--color-border)] p-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_6rem_6rem_minmax(0,1fr)_2.25rem] lg:border-0 lg:p-0"
+            className="grid gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_6rem_6rem_minmax(0,1fr)_2.25rem] lg:border-0 lg:p-0"
           >
             <Select
               value={line.accountId}
@@ -240,7 +240,7 @@ export function ManualEntryForm({
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] bg-[var(--color-muted)] px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] bg-[var(--color-muted)] px-4 py-3">
         <p className="font-mono text-sm">
           Débito {totals.debit.toFixed(2)} · Crédito {totals.credit.toFixed(2)}
         </p>

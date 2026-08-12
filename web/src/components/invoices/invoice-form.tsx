@@ -180,7 +180,7 @@ export function InvoiceForm({
 
   if (!partners.length) {
     return (
-      <div className="space-y-2 rounded-[14px] border border-dashed border-[var(--color-border)] p-4">
+      <div className="space-y-2 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] p-4">
         <p className="text-sm text-[var(--color-foreground)]">
           La factura necesita un cliente o proveedor (RIF) para libros y retenciones SENIAT.
         </p>
@@ -332,7 +332,7 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <label className="flex items-start gap-3 rounded-[14px] border border-[var(--color-border)] px-4 py-3">
+      <label className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
         <input
           type="checkbox"
           className="mt-1"
@@ -348,7 +348,7 @@ export function InvoiceForm({
       </label>
 
       {showImport && (
-        <div className="grid gap-3 rounded-[14px] border border-dashed border-[var(--color-border)] p-4 md:grid-cols-3">
+        <div className="grid gap-3 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] p-4 md:grid-cols-3">
           <div className="md:col-span-3">
             <p className="text-sm font-semibold">Importación (opcional)</p>
             <p className="text-xs text-[var(--color-muted-foreground)]">
@@ -418,7 +418,7 @@ export function InvoiceForm({
           {computedLines.map(({ line, base, tax, isExempt }, idx) => (
             <div
               key={line.id}
-              className="rounded-[14px] border border-[var(--color-border)] p-3 lg:border-0 lg:p-0"
+              className="rounded-[var(--radius-md)] border border-[var(--color-border)] p-3 lg:border-0 lg:p-0"
             >
               <p className="mb-2 text-xs font-medium text-[var(--color-muted-foreground)] lg:hidden">
                 Línea {idx + 1}
@@ -517,13 +517,13 @@ export function InvoiceForm({
                     ))}
                   </Select>
                 </div>
-                <div className="flex flex-col justify-center rounded-[14px] bg-[var(--color-muted)] px-3 py-2.5 lg:min-h-[46px]">
+                <div className="flex flex-col justify-center rounded-[var(--radius-md)] bg-[var(--color-muted)] px-3 py-2.5 lg:min-h-[46px]">
                   <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-muted-foreground)] lg:hidden">
                     Base {isExempt ? "(exento)" : ""}
                   </span>
                   <span className="font-mono text-sm tabular-nums">{money(base)}</span>
                 </div>
-                <div className="flex flex-col justify-center rounded-[14px] bg-[var(--color-muted)] px-3 py-2.5 lg:min-h-[46px]">
+                <div className="flex flex-col justify-center rounded-[var(--radius-md)] bg-[var(--color-muted)] px-3 py-2.5 lg:min-h-[46px]">
                   <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--color-muted-foreground)] lg:hidden">
                     IVA
                   </span>
@@ -550,7 +550,7 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-[14px] bg-[var(--color-muted)] p-4 md:grid-cols-5">
+      <div className="grid gap-3 rounded-[var(--radius-md)] bg-[var(--color-muted)] p-4 md:grid-cols-5">
         <div>
           <p className="text-xs text-[var(--color-muted-foreground)]">Base gravable</p>
           <p className="font-mono text-sm font-semibold">{dual(totals.untaxed, rateNum)}</p>

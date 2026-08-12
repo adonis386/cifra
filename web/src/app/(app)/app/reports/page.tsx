@@ -206,7 +206,7 @@ export default async function ReportsPage({
               id="partner"
               name="partner"
               defaultValue={partnerId}
-              className="w-full rounded-[14px] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
+              className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3.5 py-3 text-sm"
             >
               {(partners || []).map((p) => (
                 <option key={p.id} value={p.id}>
@@ -217,14 +217,14 @@ export default async function ReportsPage({
           </div>
           <button
             type="submit"
-            className="rounded-[14px] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+            className="rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-white"
           >
             Ver
           </button>
           {partnerId && (
             <Link
               href={`/app/statements?partner=${partnerId}`}
-              className="rounded-[14px] border border-[var(--color-border)] px-4 py-2.5 text-sm font-semibold"
+              className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-2.5 text-sm font-semibold"
             >
               Estado completo
             </Link>

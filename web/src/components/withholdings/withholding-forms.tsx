@@ -50,7 +50,7 @@ export function WithholdingHub({
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 rounded-full bg-[var(--color-muted)] p-1 w-fit">
+      <div className="flex w-fit gap-1 border border-[var(--color-border)] bg-[var(--color-muted)] p-1">
         {[
           { id: "iva" as const, label: "IVA · TXT 99035" },
           { id: "islr" as const, label: "ISLR · XML" },
@@ -59,9 +59,9 @@ export function WithholdingHub({
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
+            className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
               tab === t.id
-                ? "bg-[var(--color-primary)] text-white shadow-sm"
+                ? "bg-[var(--brand-accent)] text-white"
                 : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
             }`}
           >
@@ -108,7 +108,7 @@ export function WithholdingHub({
             </Button>
             {txt && (
               <div className="space-y-2">
-                <textarea className="h-40 w-full rounded-[14px] border border-[var(--color-border)] bg-[var(--color-muted)] p-3 font-mono text-xs" readOnly value={txt} />
+                <textarea className="h-40 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-muted)] p-3 font-mono text-xs" readOnly value={txt} />
                 <a
                   className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
                   href={`data:text/plain;charset=utf-8,${encodeURIComponent(txt)}`}
@@ -193,7 +193,7 @@ export function WithholdingHub({
             </Button>
             {xml && (
               <div className="space-y-2">
-                <textarea className="h-40 w-full rounded-[14px] border border-[var(--color-border)] bg-[var(--color-muted)] p-3 font-mono text-xs" readOnly value={xml} />
+                <textarea className="h-40 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-muted)] p-3 font-mono text-xs" readOnly value={xml} />
                 <a
                   className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
                   href={`data:application/xml;charset=ISO-8859-1,${encodeURIComponent(xml)}`}
