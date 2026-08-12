@@ -40,11 +40,22 @@ export async function createInvoice(
   }
 
   const amountTax = Number(((amountUntaxed * taxRate) / 100).toFixed(2));
-  const amountTotal = Number((amountUntaxed + amountTax + amountExempt).toFixed(2));
-  const amountRetained = Number(((amountTax * withholdingPct) / 100).toFixed(2));
   const { operation, doc } = moveMeta(moveType);
 
-  let parsedLines: Array<{ description: string; base: number; rate: number; exempt: number }> = [];
+  type ParsedLine = {
+    description: string;
+    quantity?: number;
+    price_unit?: number;
+    rate: number;
+    base?: number;
+    untaxed?: number;
+    tax?: number;
+    exempt?: number;
+    total?: number;
+    tax_code?: string;
+  };
+
+  let parsedLines: ParsedLine[] = [];
   try {
     parsedLines = JSON.parse(String(formData.get("lines_json") || "[]"));
   } catch {
@@ -54,20 +65,55 @@ export async function createInvoice(
     parsedLines = [
       {
         description: "Línea principal",
-        base: amountUntaxed,
+        quantity: 1,
+        price_unit: amountUntaxed || amountExempt,
         rate: taxRate,
+        untaxed: amountUntaxed,
+        tax: amountTax,
         exempt: amountExempt,
+        base: amountUntaxed || amountExempt,
       },
     ];
   }
 
-  // Prefer totals from lines when provided
-  const linesUntaxed = parsedLines.reduce((s, l) => s + Number(l.base || 0), 0);
-  const linesTax = parsedLines.reduce(
-    (s, l) => s + (Number(l.base || 0) * Number(l.rate || 0)) / 100,
-    0,
-  );
-  const linesExempt = parsedLines.reduce((s, l) => s + Number(l.exempt || 0), 0);
+  const normalized = parsedLines.map((l) => {
+    const quantity = Number(l.quantity ?? 1) || 0;
+    const priceUnit = Number(
+      l.price_unit ??
+        (quantity ? Number(l.base || 0) / quantity : Number(l.base || 0)),
+    );
+    const rate = Number(l.rate || 0);
+    const gross = Number((quantity * priceUnit).toFixed(2));
+    const hasExplicit =
+      l.untaxed != null || l.tax != null || l.exempt != null;
+    const untaxed = hasExplicit
+      ? Number(l.untaxed || 0)
+      : rate > 0
+        ? gross
+        : 0;
+    const tax = hasExplicit
+      ? Number(l.tax || 0)
+      : Number(((untaxed * rate) / 100).toFixed(2));
+    const exempt = hasExplicit
+      ? Number(l.exempt || 0)
+      : rate > 0
+        ? 0
+        : gross;
+    return {
+      description: l.description || "Línea",
+      quantity,
+      price_unit: priceUnit,
+      rate,
+      untaxed,
+      tax,
+      exempt,
+      total: Number((untaxed + tax + exempt).toFixed(2)),
+    };
+  });
+
+  const linesUntaxed = normalized.reduce((s, l) => s + l.untaxed, 0);
+  const linesTax = normalized.reduce((s, l) => s + l.tax, 0);
+  const linesExempt = normalized.reduce((s, l) => s + l.exempt, 0);
   const finalUntaxed = Number((linesUntaxed || amountUntaxed).toFixed(2));
   const finalTax = Number((linesTax || amountTax).toFixed(2));
   const finalExempt = Number((linesExempt || amountExempt).toFixed(2));
@@ -111,22 +157,17 @@ export async function createInvoice(
   if (error) return { error: error.message };
 
   const { error: lineErr } = await supabase.from("invoice_lines").insert(
-    parsedLines.map((l) => {
-      const base = Number(l.base || 0);
-      const rate = Number(l.rate || 0);
-      const tax = Number(((base * rate) / 100).toFixed(2));
-      return {
-        invoice_id: invoice.id,
-        company_id: company.id,
-        description: l.description || "Línea",
-        quantity: 1,
-        price_unit: base,
-        tax_rate: rate,
-        amount_untaxed: base,
-        amount_tax: tax,
-        amount_total: base + tax,
-      };
-    }),
+    normalized.map((l) => ({
+      invoice_id: invoice.id,
+      company_id: company.id,
+      description: l.description,
+      quantity: l.quantity,
+      price_unit: l.price_unit,
+      tax_rate: l.rate,
+      amount_untaxed: l.untaxed || l.exempt,
+      amount_tax: l.tax,
+      amount_total: l.total,
+    })),
   );
   if (lineErr) return { error: lineErr.message };
 

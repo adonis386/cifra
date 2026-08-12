@@ -54,7 +54,10 @@ export default async function InvoicesPage() {
         description="Compras y ventas con control fiscal, multi-alícuota y retenciones."
       />
 
-      <SectionCard title="Registrar documento" description="Usa líneas para 16%, 8% y exento.">
+      <SectionCard
+        title="Registrar documento"
+        description="Líneas con cantidad × precio y alícuota (IVA 16%, 8% o exento), como en Odoo."
+      >
         <InvoiceForm partners={partners || []} />
       </SectionCard>
 
