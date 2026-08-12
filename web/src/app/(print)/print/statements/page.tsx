@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import { PrintFooter, PrintLetterhead } from "@/components/print/print-branding";
 import { PrintToolbar } from "@/components/print/print-toolbar";
 import { formatMoney } from "@/lib/company";
+import { getCompanyPrintProfile } from "@/lib/company-print";
 import { loadPartnerStatement } from "@/lib/export/reports-data";
 
 export default async function PrintStatementPage({
@@ -17,6 +19,8 @@ export default async function PrintStatementPage({
 
   const data = await loadPartnerStatement({ partnerId, from, to });
   if (!data) notFound();
+  const profile = await getCompanyPrintProfile(data.company.id);
+  if (!profile) notFound();
 
   const qs = new URLSearchParams({ partner: partnerId, from, to }).toString();
 
@@ -26,14 +30,8 @@ export default async function PrintStatementPage({
         backHref={`/app/statements?${qs}`}
         xlsxHref={`/api/export/statements?${qs}`}
       />
-
-      <p className="print-title" style={{ color: "#0f172a" }}>
-        Estado de cuenta
-      </p>
-      <p style={{ margin: "4px 0" }}>
-        <strong>{data.full.name}</strong> · RIF {data.full.rif}
-      </p>
-      <p style={{ margin: "8px 0 4px" }}>
+      <PrintLetterhead company={profile} documentTitle="Estado de cuenta" />
+      <p style={{ margin: "0 0 4px" }}>
         <strong>{data.partner.name}</strong> · {data.partner.rif}
       </p>
       <p style={{ fontSize: 11, marginBottom: 14 }}>
@@ -64,6 +62,7 @@ export default async function PrintStatementPage({
           ))}
         </tbody>
       </table>
+      <PrintFooter company={profile} />
     </div>
   );
 }

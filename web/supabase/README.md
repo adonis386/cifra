@@ -15,6 +15,7 @@
    - `migrations/20260812000008_dual_currency_fiscal.sql` ← tasa USD, sin_cred, ISLR en líneas, N° control
    - `migrations/20260812000009_cifra_libro.sql` ← extractos caja/banco, períodos, auditoría ampliada
    - `migrations/20260812000010_fix_doc_state_posted.sql` ← default payments → `confirmed`
+   - `migrations/20260812000011_company_print_branding.sql` ← membrete PDF (logo, pie, subtítulo)
 
 O pega el contenido de `migrations/ALL.sql` (si existe) de una vez, y luego aplica `00008` si ALL aún no la incluye.
 

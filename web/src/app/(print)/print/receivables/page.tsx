@@ -1,11 +1,15 @@
 import { notFound } from "next/navigation";
+import { PrintFooter, PrintLetterhead } from "@/components/print/print-branding";
 import { PrintToolbar } from "@/components/print/print-toolbar";
 import { formatMoney } from "@/lib/company";
+import { getCompanyPrintProfile } from "@/lib/company-print";
 import { loadOpenInvoices } from "@/lib/export/reports-data";
 
 export default async function PrintReceivablesPage() {
   const data = await loadOpenInvoices("receivable");
   if (!data) notFound();
+  const profile = await getCompanyPrintProfile(data.company.id);
+  if (!profile) notFound();
 
   const total = data.rows.reduce((s, r) => s + r.saldo, 0);
 
@@ -15,13 +19,7 @@ export default async function PrintReceivablesPage() {
         backHref="/app/receivables"
         xlsxHref="/api/export/receivables"
       />
-
-      <p className="print-title" style={{ color: "#0f172a" }}>
-        Cuentas por cobrar
-      </p>
-      <p style={{ margin: "4px 0" }}>
-        <strong>{data.full.name}</strong> · RIF {data.full.rif}
-      </p>
+      <PrintLetterhead company={profile} documentTitle="Cuentas por cobrar" />
       <p style={{ fontSize: 11, marginBottom: 14 }}>
         Corte {data.today} · Total saldo {formatMoney(total)} Bs
       </p>
@@ -64,6 +62,7 @@ export default async function PrintReceivablesPage() {
           </tr>
         </tfoot>
       </table>
+      <PrintFooter company={profile} />
     </div>
   );
 }

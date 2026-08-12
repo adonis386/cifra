@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { BrandingForm } from "@/components/config/branding-form";
 import { ConfigForms } from "@/components/config/config-forms";
+import { getCompanyPrintProfile } from "@/lib/company-print";
 import { formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -17,7 +19,10 @@ export default async function ConfigPage() {
     return (
       <div className="space-y-6">
         <PageHeader title="Configuración" />
-        <Link href="/app/empresa/nueva" className="text-sm font-semibold text-[var(--color-primary)] underline">
+        <Link
+          href="/app/empresa/nueva"
+          className="text-sm font-semibold text-[var(--color-primary)] underline"
+        >
           Crear empresa
         </Link>
       </div>
@@ -26,8 +31,9 @@ export default async function ConfigPage() {
 
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
-  const [{ data: units }, { data: concepts }, { data: rates }, rateToday] =
+  const [branding, { data: units }, { data: concepts }, { data: rates }, rateToday] =
     await Promise.all([
+      getCompanyPrintProfile(company.id),
       supabase
         .from("tax_units")
         .select("id, name, amount, date_from, company_id")
@@ -63,12 +69,23 @@ export default async function ConfigPage() {
     <div className="space-y-8">
       <PageHeader
         eyebrow="Sistema"
-        title="Configuración fiscal"
-        description="Tasa USD/Bs, unidad tributaria y catálogo ISLR (l10n_ve_full)."
+        title="Configuración"
+        description="Membrete PDF, datos de empresa, tasa USD/Bs, UT y catálogo ISLR."
       />
 
       <SectionCard
-        title="Parámetros"
+        title="Empresa y membrete"
+        description="Nombre, correo, logo y pie de página en facturas y reportes PDF. Esencial para venta por licencia multi-empresa."
+      >
+        {branding ? (
+          <BrandingForm company={branding} />
+        ) : (
+          <EmptyState title="Sin datos de empresa" />
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="Parámetros fiscales"
         description="Tasa BCV automática, UT y catálogo ISLR."
       >
         <ConfigForms latestRate={latest} />
@@ -89,7 +106,9 @@ export default async function ConfigPage() {
                 {(rates || []).map((r) => (
                   <tr key={r.id}>
                     <Td>{r.rate_date}</Td>
-                    <Td className="text-right font-mono text-xs">{formatMoney(r.rate)}</Td>
+                    <Td className="text-right font-mono text-xs">
+                      {formatMoney(r.rate)}
+                    </Td>
                     <Td>{r.company_id ? "Empresa" : "Global"}</Td>
                   </tr>
                 ))}
@@ -118,13 +137,18 @@ export default async function ConfigPage() {
                   <tr key={u.id}>
                     <Td>{u.name}</Td>
                     <Td>{u.date_from}</Td>
-                    <Td className="text-right font-mono text-xs">{Number(u.amount).toFixed(4)}</Td>
+                    <Td className="text-right font-mono text-xs">
+                      {Number(u.amount).toFixed(4)}
+                    </Td>
                   </tr>
                 ))}
               </tbody>
             </DataTable>
           ) : (
-            <EmptyState title="Sin UT" description="Ejecuta la migración 04 o crea una UT." />
+            <EmptyState
+              title="Sin UT"
+              description="Ejecuta la migración 04 o crea una UT."
+            />
           )}
         </SectionCard>
 
@@ -147,7 +171,10 @@ export default async function ConfigPage() {
               </tbody>
             </DataTable>
           ) : (
-            <EmptyState title="Sin conceptos" description="Corre SQL 04 y luego clona el catálogo." />
+            <EmptyState
+              title="Sin conceptos"
+              description="Corre SQL 04 y luego clona el catálogo."
+            />
           )}
         </SectionCard>
       </div>

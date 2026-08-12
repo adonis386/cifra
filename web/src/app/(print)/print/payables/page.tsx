@@ -1,24 +1,22 @@
 import { notFound } from "next/navigation";
+import { PrintFooter, PrintLetterhead } from "@/components/print/print-branding";
 import { PrintToolbar } from "@/components/print/print-toolbar";
 import { formatMoney } from "@/lib/company";
+import { getCompanyPrintProfile } from "@/lib/company-print";
 import { loadOpenInvoices } from "@/lib/export/reports-data";
 
 export default async function PrintPayablesPage() {
   const data = await loadOpenInvoices("payable");
   if (!data) notFound();
+  const profile = await getCompanyPrintProfile(data.company.id);
+  if (!profile) notFound();
 
   const total = data.rows.reduce((s, r) => s + r.saldo, 0);
 
   return (
     <div className="print-sheet">
       <PrintToolbar backHref="/app/payables" xlsxHref="/api/export/payables" />
-
-      <p className="print-title" style={{ color: "#0f172a" }}>
-        Cuentas por pagar
-      </p>
-      <p style={{ margin: "4px 0" }}>
-        <strong>{data.full.name}</strong> · RIF {data.full.rif}
-      </p>
+      <PrintLetterhead company={profile} documentTitle="Cuentas por pagar" />
       <p style={{ fontSize: 11, marginBottom: 14 }}>
         Corte {data.today} · Total saldo {formatMoney(total)} Bs
       </p>
@@ -61,6 +59,7 @@ export default async function PrintPayablesPage() {
           </tr>
         </tfoot>
       </table>
+      <PrintFooter company={profile} />
     </div>
   );
 }

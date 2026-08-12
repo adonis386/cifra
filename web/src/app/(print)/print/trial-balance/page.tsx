@@ -1,11 +1,15 @@
 import { notFound } from "next/navigation";
+import { PrintFooter, PrintLetterhead } from "@/components/print/print-branding";
 import { PrintToolbar } from "@/components/print/print-toolbar";
 import { formatMoney } from "@/lib/company";
+import { getCompanyPrintProfile } from "@/lib/company-print";
 import { loadTrialBalance } from "@/lib/export/reports-data";
 
 export default async function PrintTrialBalancePage() {
   const data = await loadTrialBalance();
   if (!data) notFound();
+  const profile = await getCompanyPrintProfile(data.company.id);
+  if (!profile) notFound();
 
   const totalDebit = data.rows.reduce((s, r) => s + r.debe, 0);
   const totalCredit = data.rows.reduce((s, r) => s + r.haber, 0);
@@ -16,13 +20,10 @@ export default async function PrintTrialBalancePage() {
         backHref="/app/accounts"
         xlsxHref="/api/export/trial-balance"
       />
-
-      <p className="print-title" style={{ color: "#0f172a" }}>
-        Balance de comprobación
-      </p>
-      <p style={{ margin: "4px 0" }}>
-        <strong>{data.full.name}</strong> · RIF {data.full.rif}
-      </p>
+      <PrintLetterhead
+        company={profile}
+        documentTitle="Balance de comprobación"
+      />
       <p style={{ fontSize: 11, marginBottom: 14 }}>
         Saldos acumulados · Debe {formatMoney(totalDebit)} · Haber{" "}
         {formatMoney(totalCredit)}
@@ -64,6 +65,7 @@ export default async function PrintTrialBalancePage() {
           </tr>
         </tfoot>
       </table>
+      <PrintFooter company={profile} />
     </div>
   );
 }

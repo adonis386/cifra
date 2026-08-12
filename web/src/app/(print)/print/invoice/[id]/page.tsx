@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import { PrintFooter, PrintLetterhead } from "@/components/print/print-branding";
 import { PrintToolbar } from "@/components/print/print-toolbar";
 import { formatMoney, getActiveCompany } from "@/lib/company";
+import { getCompanyPrintProfile } from "@/lib/company-print";
 import { createClient } from "@/lib/supabase/server";
 
 const moveTitle: Record<string, string> = {
@@ -20,12 +22,8 @@ export default async function PrintInvoicePage({
   if (!company) notFound();
 
   const supabase = await createClient();
-  const [{ data: fullCompany }, { data: inv }] = await Promise.all([
-    supabase
-      .from("companies")
-      .select("id, name, rif, address, phone, email")
-      .eq("id", company.id)
-      .single(),
+  const [profile, { data: inv }] = await Promise.all([
+    getCompanyPrintProfile(company.id),
     supabase
       .from("invoices")
       .select(
@@ -42,7 +40,7 @@ export default async function PrintInvoicePage({
       .single(),
   ]);
 
-  if (!inv) notFound();
+  if (!inv || !profile) notFound();
 
   const partner = inv.partners as unknown as
     | {
@@ -83,66 +81,41 @@ export default async function PrintInvoicePage({
     <div className="print-sheet">
       <PrintToolbar backHref="/app/invoices" />
 
-      <table style={{ width: "100%", marginBottom: 14 }}>
+      <PrintLetterhead company={profile} documentTitle={title} />
+
+      <table className="print-box" style={{ marginBottom: 14 }}>
         <tbody>
           <tr>
-            <td style={{ width: "58%", verticalAlign: "top" }}>
-              <p className="print-title" style={{ color: "#0f172a" }}>
-                {title}
-              </p>
-              <p style={{ marginTop: 8, fontSize: 14, fontWeight: 700 }}>
-                {fullCompany?.name}
-              </p>
-              <p style={{ fontSize: 11 }}>RIF {fullCompany?.rif}</p>
-              {fullCompany?.address ? (
-                <p style={{ fontSize: 11 }}>{fullCompany.address}</p>
-              ) : null}
-              {(fullCompany?.phone || fullCompany?.email) && (
-                <p style={{ fontSize: 11 }}>
-                  {[fullCompany.phone, fullCompany.email].filter(Boolean).join(" · ")}
-                </p>
-              )}
+            <td>
+              <strong>Nº factura</strong>
+              <div style={{ fontFamily: "monospace" }}>{inv.invoice_number}</div>
             </td>
-            <td style={{ verticalAlign: "top" }}>
-              <table className="print-box">
-                <tbody>
-                  <tr>
-                    <td>
-                      <strong>Nº factura</strong>
-                      <div style={{ fontFamily: "monospace" }}>{inv.invoice_number}</div>
-                    </td>
-                    <td>
-                      <strong>Nº control</strong>
-                      <div style={{ fontFamily: "monospace" }}>
-                        {inv.control_number || "—"}
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <strong>Fecha</strong>
-                      <div>{inv.invoice_date}</div>
-                    </td>
-                    <td>
-                      <strong>Vence</strong>
-                      <div>{inv.due_date || "—"}</div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <strong>Tipo doc.</strong>
-                      <div>{inv.doc_type}</div>
-                    </td>
-                    <td>
-                      <strong>Moneda</strong>
-                      <div>
-                        {inv.currency_code || "VES"}
-                        {rate > 0 ? ` · tasa ${formatMoney(rate)}` : ""}
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <td>
+              <strong>Nº control</strong>
+              <div style={{ fontFamily: "monospace" }}>
+                {inv.control_number || "—"}
+              </div>
+            </td>
+            <td>
+              <strong>Fecha</strong>
+              <div>{inv.invoice_date}</div>
+            </td>
+            <td>
+              <strong>Vence</strong>
+              <div>{inv.due_date || "—"}</div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <strong>Tipo doc.</strong>
+              <div>{inv.doc_type}</div>
+            </td>
+            <td colSpan={3}>
+              <strong>Moneda</strong>
+              <div>
+                {inv.currency_code || "VES"}
+                {rate > 0 ? ` · tasa ${formatMoney(rate)}` : ""}
+              </div>
             </td>
           </tr>
         </tbody>
@@ -257,7 +230,13 @@ export default async function PrintInvoicePage({
                     <td>
                       <strong>Total</strong>
                     </td>
-                    <td style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 700 }}>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        fontFamily: "monospace",
+                        fontWeight: 700,
+                      }}
+                    >
                       {formatMoney(inv.amount_total)} Bs
                       {inv.amount_total_usd != null && rate > 0
                         ? ` · $ ${formatMoney(inv.amount_total_usd)}`
@@ -282,7 +261,13 @@ export default async function PrintInvoicePage({
                     <td>
                       <strong>Neto a pagar / cobrar</strong>
                     </td>
-                    <td style={{ textAlign: "right", fontFamily: "monospace", fontWeight: 700 }}>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        fontFamily: "monospace",
+                        fontWeight: 700,
+                      }}
+                    >
                       {formatMoney(neto)} Bs
                     </td>
                   </tr>
@@ -296,20 +281,32 @@ export default async function PrintInvoicePage({
       <table style={{ width: "100%", marginTop: 48 }}>
         <tbody>
           <tr>
-            <td style={{ width: "45%", textAlign: "center", borderTop: "1px solid #111", paddingTop: 8 }}>
+            <td
+              style={{
+                width: "45%",
+                textAlign: "center",
+                borderTop: "1px solid #111",
+                paddingTop: 8,
+              }}
+            >
               Emisor
             </td>
             <td style={{ width: "10%" }} />
-            <td style={{ width: "45%", textAlign: "center", borderTop: "1px solid #111", paddingTop: 8 }}>
+            <td
+              style={{
+                width: "45%",
+                textAlign: "center",
+                borderTop: "1px solid #111",
+                paddingTop: 8,
+              }}
+            >
               Receptor
             </td>
           </tr>
         </tbody>
       </table>
 
-      <p style={{ marginTop: 28, fontSize: 11 }}>
-        Emitido por Cifra · {fullCompany?.name} · {fullCompany?.rif}
-      </p>
+      <PrintFooter company={profile} />
     </div>
   );
 }

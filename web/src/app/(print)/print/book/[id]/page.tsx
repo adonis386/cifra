@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import { PrintFooter, PrintLetterhead } from "@/components/print/print-branding";
 import { PrintToolbar } from "@/components/print/print-toolbar";
 import { formatMoney, getActiveCompany } from "@/lib/company";
+import { getCompanyPrintProfile } from "@/lib/company-print";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function PrintBookPage({
@@ -13,8 +15,8 @@ export default async function PrintBookPage({
   if (!company) notFound();
 
   const supabase = await createClient();
-  const [{ data: fullCompany }, { data: book }] = await Promise.all([
-    supabase.from("companies").select("name, rif, address").eq("id", company.id).single(),
+  const [profile, { data: book }] = await Promise.all([
+    getCompanyPrintProfile(company.id),
     supabase
       .from("fiscal_books")
       .select("id, name, book_type, period_start, period_end, state")
@@ -22,7 +24,7 @@ export default async function PrintBookPage({
       .eq("company_id", company.id)
       .single(),
   ]);
-  if (!book) notFound();
+  if (!book || !profile) notFound();
 
   const { data: lines } = await supabase
     .from("fiscal_book_lines")
@@ -53,16 +55,11 @@ export default async function PrintBookPage({
         xlsxHref={`/api/export/book?id=${book.id}`}
       />
 
-      <div style={{ marginBottom: 16 }}>
-        <p className="print-title">{title}</p>
-        <p style={{ margin: "4px 0" }}>
-          <strong>{fullCompany?.name}</strong> · RIF {fullCompany?.rif}
-        </p>
-        <p style={{ margin: 0, fontSize: 11 }}>{fullCompany?.address || ""}</p>
-        <p style={{ marginTop: 8 }}>
-          Período: <strong>{book.period_start}</strong> → <strong>{book.period_end}</strong>
-        </p>
-      </div>
+      <PrintLetterhead company={profile} documentTitle={title} />
+      <p style={{ marginBottom: 14, fontSize: 12 }}>
+        Período: <strong>{book.period_start}</strong> →{" "}
+        <strong>{book.period_end}</strong>
+      </p>
 
       <table className="print-table">
         <thead>
@@ -104,18 +101,26 @@ export default async function PrintBookPage({
             <td colSpan={7} style={{ textAlign: "right", fontWeight: 700 }}>
               Totales
             </td>
-            <td style={{ textAlign: "right", fontWeight: 700 }}>{formatMoney(totals.untaxed)}</td>
-            <td style={{ textAlign: "right", fontWeight: 700 }}>{formatMoney(totals.tax)}</td>
-            <td style={{ textAlign: "right", fontWeight: 700 }}>{formatMoney(totals.exempt)}</td>
-            <td style={{ textAlign: "right", fontWeight: 700 }}>{formatMoney(totals.total)}</td>
-            <td style={{ textAlign: "right", fontWeight: 700 }}>{formatMoney(totals.retained)}</td>
+            <td style={{ textAlign: "right", fontWeight: 700 }}>
+              {formatMoney(totals.untaxed)}
+            </td>
+            <td style={{ textAlign: "right", fontWeight: 700 }}>
+              {formatMoney(totals.tax)}
+            </td>
+            <td style={{ textAlign: "right", fontWeight: 700 }}>
+              {formatMoney(totals.exempt)}
+            </td>
+            <td style={{ textAlign: "right", fontWeight: 700 }}>
+              {formatMoney(totals.total)}
+            </td>
+            <td style={{ textAlign: "right", fontWeight: 700 }}>
+              {formatMoney(totals.retained)}
+            </td>
           </tr>
         </tfoot>
       </table>
 
-      <p style={{ marginTop: 24, fontSize: 11 }}>
-        Generado con Cifra · basado en account.fiscal.book (l10n_ve_full)
-      </p>
+      <PrintFooter company={profile} />
     </div>
   );
 }
