@@ -15,9 +15,11 @@ export function PageHeader({
     <div className="flex flex-col gap-4 border-b border-[var(--color-border)] pb-6 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0 space-y-1">
         {eyebrow && (
-          <p className="label-brand">{eyebrow}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+            {eyebrow}
+          </p>
         )}
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--color-foreground)] md:text-[1.85rem]">
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--color-foreground)] md:text-[1.75rem]">
           {title}
         </h1>
         {description && (
@@ -49,7 +51,7 @@ export function SectionCard({
       {(title || description) && (
         <div className="mb-5 space-y-1">
           {title && (
-            <h2 className="font-display text-base font-semibold tracking-tight text-[var(--color-foreground)]">
+            <h2 className="text-base font-semibold text-[var(--color-foreground)]">
               {title}
             </h2>
           )}
@@ -103,7 +105,7 @@ export function Badge({
     primary: "bg-[color-mix(in_srgb,var(--color-primary)_12%,white)] text-[var(--color-primary)]",
   };
   return (
-    <span className={`inline-flex rounded-[var(--radius-md)] px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${tones[tone]}`}>
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>
       {children}
     </span>
   );

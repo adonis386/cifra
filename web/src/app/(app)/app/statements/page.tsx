@@ -203,17 +203,17 @@ export default async function StatementsPage({
 
       {partner && (
         <>
-          <section className="border border-[var(--brand-border)] bg-[var(--brand-bg)] px-6 py-5 text-white">
-            <p className="text-sm text-white/70">Estado de cuenta</p>
+          <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--brand-accent-muted)] px-6 py-5 text-[var(--color-foreground)]">
+            <p className="text-sm text-[var(--color-muted-foreground)]">Estado de cuenta</p>
             <h2 className="mt-1 text-xl font-bold">{partner.name}</h2>
-            <p className="font-mono text-sm text-white/80">{partner.rif}</p>
-            <p className="mt-4 text-sm text-white/70">Saldo pendiente</p>
-            <p className="font-mono text-2xl font-bold">
+            <p className="font-mono text-sm text-[var(--color-muted-foreground)]">{partner.rif}</p>
+            <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">Saldo pendiente</p>
+            <p className="font-mono text-2xl font-bold text-[var(--color-primary)]">
               {rate
                 ? formatDual(openResidual, rate)
                 : `${formatMoney(openResidual)} Bs`}
             </p>
-            <p className="mt-1 text-xs text-white/60">
+            <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
               Período {from} → {to}
             </p>
           </section>

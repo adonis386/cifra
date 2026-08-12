@@ -59,9 +59,9 @@ export function WithholdingHub({
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
+            className={`rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold transition-colors duration-200 ${
               tab === t.id
-                ? "bg-[var(--brand-accent)] text-white"
+                ? "bg-[var(--color-primary)] text-white"
                 : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
             }`}
           >

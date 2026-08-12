@@ -10,7 +10,7 @@ export default async function LoginPage({
 
   return (
     <div>
-      <h2 className="mb-1 font-display text-xl font-semibold tracking-tight text-[var(--color-foreground)]">
+      <h2 className="mb-1 text-xl font-semibold text-[var(--color-foreground)]">
         Entrar
       </h2>
       <p className="mb-6 text-sm text-[var(--color-muted-foreground)]">

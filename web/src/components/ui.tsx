@@ -9,16 +9,16 @@ export function Button({
   variant?: "primary" | "secondary" | "ghost" | "soft";
 }) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-4 py-2.5 text-sm font-semibold uppercase tracking-wider transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
+    "inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] px-4 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
   const variants = {
     primary:
-      "bg-[var(--brand-accent)] text-white hover:bg-[var(--brand-accent-hover)]",
+      "bg-[var(--color-primary)] text-white shadow-[var(--shadow-sm)] hover:bg-[var(--color-primary-soft)]",
     secondary:
-      "border border-[var(--color-foreground)] text-[var(--color-foreground)] bg-white hover:border-[var(--brand-accent)] hover:bg-[var(--brand-accent)] hover:text-white",
+      "border border-[var(--color-border)] text-[var(--color-foreground)] bg-white hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]",
     soft:
-      "bg-[var(--brand-accent-muted)] text-[var(--brand-accent)] hover:bg-[color-mix(in_srgb,var(--brand-accent)_18%,white)]",
+      "bg-[var(--brand-accent-muted)] text-[var(--color-primary)] hover:bg-[color-mix(in_srgb,var(--color-primary)_14%,white)]",
     ghost:
-      "normal-case tracking-normal text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]",
+      "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]",
   };
 
   return (
