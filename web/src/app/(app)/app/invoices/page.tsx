@@ -138,12 +138,20 @@ export default async function InvoicesPage() {
                     </Td>
                     <Td className="text-right font-mono">{formatMoney(inv.amount_retained_iva)}</Td>
                     <Td className="text-right">
-                      <form action={deleteInvoice}>
-                        <input type="hidden" name="id" value={inv.id} />
-                        <Button type="submit" variant="ghost" className="text-[var(--color-destructive)]">
-                          Eliminar
-                        </Button>
-                      </form>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/print/invoice/${inv.id}`}
+                          className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+                        >
+                          Imprimir
+                        </Link>
+                        <form action={deleteInvoice}>
+                          <input type="hidden" name="id" value={inv.id} />
+                          <Button type="submit" variant="ghost" className="text-[var(--color-destructive)]">
+                            Eliminar
+                          </Button>
+                        </form>
+                      </div>
                     </Td>
                   </tr>
                 );
