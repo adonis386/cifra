@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReportExportActions } from "@/components/report-export-actions";
 import {
   formatDual,
   formatMoney,
@@ -145,6 +146,14 @@ export default async function StatementsPage({
         eyebrow="Libro"
         title="Estado de cuenta"
         description="Reporte de contacto: facturas, cobros/pagos y saldo del tercero. Pensado para enviar al cliente o proveedor."
+        actions={
+          partnerId ? (
+            <ReportExportActions
+              pdfHref={`/print/statements?partner=${partnerId}&from=${from}&to=${to}`}
+              xlsxHref={`/api/export/statements?partner=${partnerId}&from=${from}&to=${to}`}
+            />
+          ) : undefined
+        }
       />
 
       <SectionCard title="Seleccionar contacto">

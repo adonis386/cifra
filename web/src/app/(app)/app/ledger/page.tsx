@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReportExportActions } from "@/components/report-export-actions";
 import { formatDual, formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -108,6 +109,14 @@ export default async function LedgerPage({
         eyebrow="Libro"
         title="Mayor"
         description="Movimientos por cuenta contable, con saldo corrido y dual $ / Bs cuando hay tasa BCV."
+        actions={
+          accountId ? (
+            <ReportExportActions
+              pdfHref={`/print/ledger?account=${accountId}&from=${from}&to=${to}`}
+              xlsxHref={`/api/export/ledger?account=${accountId}&from=${from}&to=${to}`}
+            />
+          ) : undefined
+        }
       />
 
       <SectionCard title="Filtros">

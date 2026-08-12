@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ReportExportActions } from "@/components/report-export-actions";
+import { agingBucket } from "@/lib/export/aging";
 import { formatDual, formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -10,17 +12,6 @@ import {
   Td,
   Th,
 } from "@/components/layout";
-
-function agingBucket(dueDate: string | null, today: Date) {
-  if (!dueDate) return "current";
-  const due = new Date(dueDate + "T00:00:00");
-  const days = Math.floor((today.getTime() - due.getTime()) / 86400000);
-  if (days <= 0) return "current";
-  if (days <= 30) return "1-30";
-  if (days <= 60) return "31-60";
-  if (days <= 90) return "61-90";
-  return "90+";
-}
 
 export default async function ReceivablesPage() {
   const company = await getActiveCompany();
@@ -78,12 +69,18 @@ export default async function ReceivablesPage() {
         title="Cuentas por cobrar"
         description="Saldos de clientes y antigüedad estilo Odoo, con dual $ / Bs."
         actions={
-          <Link
-            href="/app/payments"
-            className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
-          >
-            Registrar cobro
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <ReportExportActions
+              pdfHref="/print/receivables"
+              xlsxHref="/api/export/receivables"
+            />
+            <Link
+              href="/app/payments"
+              className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+            >
+              Registrar cobro
+            </Link>
+          </div>
         }
       />
 

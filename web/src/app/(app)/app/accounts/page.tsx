@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ensureCompanyAccountingForm } from "@/lib/actions/accounting";
+import { ReportExportActions } from "@/components/report-export-actions";
 import { formatMoney, getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui";
@@ -73,11 +74,17 @@ export default async function AccountsPage() {
         title="Plan de cuentas"
         description="Catálogo VE de Cifra (activo, pasivo, ingreso, gasto) y orígenes de asiento. El balance de comprobación vive aquí."
         actions={
-          <form action={ensureCompanyAccountingForm}>
-            <Button type="submit" variant="secondary">
-              Regenerar plan VE
-            </Button>
-          </form>
+          <div className="flex flex-wrap items-center gap-3">
+            <ReportExportActions
+              pdfHref="/print/trial-balance"
+              xlsxHref="/api/export/trial-balance"
+            />
+            <form action={ensureCompanyAccountingForm}>
+              <Button type="submit" variant="secondary">
+                Regenerar plan VE
+              </Button>
+            </form>
+          </div>
         }
       />
 

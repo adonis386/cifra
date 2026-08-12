@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
+import { ReportExportActions } from "@/components/report-export-actions";
 import { deleteInvoice } from "@/lib/actions/invoices";
 import {
   formatDual,
@@ -75,6 +76,9 @@ export default async function InvoicesPage() {
         eyebrow="Documentos"
         title="Facturas"
         description="Compras y ventas con control fiscal, multi-alícuota, dual $ / Bs y retenciones."
+        actions={
+          <ReportExportActions xlsxHref="/api/export/invoices" />
+        }
       />
 
       <SectionCard

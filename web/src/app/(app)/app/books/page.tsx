@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BookForm } from "@/components/books/book-form";
+import { ReportExportActions } from "@/components/report-export-actions";
 import { formatMoney, getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -88,19 +89,16 @@ export default async function BooksPage({
           title="Detalle del libro"
           description={
             selectedId
-              ? "Vista en pantalla. Usa Imprimir/PDF para el formato SENIAT."
+              ? "Vista en pantalla. Exporta PDF (impresión) o Excel."
               : undefined
           }
         >
           {selectedId && (lines || []).length > 0 && (
             <div className="mb-4">
-              <Link
-                href={`/print/book/${selectedId}`}
-                target="_blank"
-                className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
-              >
-                Imprimir / PDF del libro
-              </Link>
+              <ReportExportActions
+                pdfHref={`/print/book/${selectedId}`}
+                xlsxHref={`/api/export/book?id=${selectedId}`}
+              />
             </div>
           )}
           {(lines || []).length ? (

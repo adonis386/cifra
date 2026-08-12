@@ -40,8 +40,9 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/login") || path.startsWith("/signup");
   const isAppRoute = path.startsWith("/app");
   const isPrintRoute = path.startsWith("/print");
+  const isExportRoute = path.startsWith("/api/export");
 
-  if (!isAuthenticated && (isAppRoute || isPrintRoute)) {
+  if (!isAuthenticated && (isAppRoute || isPrintRoute || isExportRoute)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);

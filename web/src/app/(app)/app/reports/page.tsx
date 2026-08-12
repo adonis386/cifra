@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Landmark,
 } from "lucide-react";
+import { ReportExportActions } from "@/components/report-export-actions";
 import { formatMoney, getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -19,42 +20,69 @@ import {
   Th,
 } from "@/components/layout";
 
-const hubs = [
+const hubs: Array<{
+  href: string;
+  title: string;
+  desc: string;
+  icon: typeof BarChart3;
+  pdf?: string;
+  xlsx?: string;
+}> = [
+  {
+    href: "/app/receivables",
+    title: "Cuentas por cobrar",
+    desc: "Aging de clientes · PDF y Excel.",
+    icon: BarChart3,
+    pdf: "/print/receivables",
+    xlsx: "/api/export/receivables",
+  },
+  {
+    href: "/app/payables",
+    title: "Cuentas por pagar",
+    desc: "Aging de proveedores · PDF y Excel.",
+    icon: BarChart3,
+    pdf: "/print/payables",
+    xlsx: "/api/export/payables",
+  },
   {
     href: "/app/statements",
     title: "Estado de cuenta",
-    desc: "Reporte de contacto para clientes y proveedores.",
+    desc: "Reporte de contacto · PDF y Excel.",
     icon: ClipboardList,
   },
   {
     href: "/app/ledger",
     title: "Mayor",
-    desc: "Movimientos y saldo por cuenta.",
+    desc: "Movimientos por cuenta · PDF y Excel.",
     icon: Library,
   },
   {
     href: "/app/accounts",
     title: "Balance de comprobación",
-    desc: "Plan VE + saldos debe/haber.",
+    desc: "Saldos debe/haber · PDF y Excel.",
     icon: Scale,
+    pdf: "/print/trial-balance",
+    xlsx: "/api/export/trial-balance",
   },
   {
-    href: "/app/entries",
-    title: "Asientos",
-    desc: "Libro diario y ajustes manuales.",
+    href: "/app/books",
+    title: "Libros fiscales",
+    desc: "Compras/ventas SENIAT · PDF y Excel.",
     icon: ScrollText,
   },
   {
-    href: "/app/treasury",
-    title: "Caja y bancos",
-    desc: "Saldos y extractos de tesorería.",
+    href: "/app/invoices",
+    title: "Facturas",
+    desc: "Listado + impresión unitaria · Excel.",
     icon: Landmark,
+    xlsx: "/api/export/invoices",
   },
   {
-    href: "/app/audit",
-    title: "Auditoría",
-    desc: "Bitácora de cambios.",
+    href: "/app/payments",
+    title: "Pagos y cobros",
+    desc: "Tesorería aplicada · Excel.",
     icon: ShieldCheck,
+    xlsx: "/api/export/payments",
   },
 ];
 
@@ -154,17 +182,23 @@ export default async function ReportsPage({
         {hubs.map((h) => {
           const Icon = h.icon;
           return (
-            <Link
+            <div
               key={h.href}
-              href={h.href}
-              className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5 shadow-[var(--shadow-sm)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"
+              className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5 shadow-[var(--shadow-sm)]"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--color-muted)] text-[var(--color-primary)]">
-                <Icon className="h-5 w-5" aria-hidden />
-              </span>
-              <p className="mt-3 font-semibold">{h.title}</p>
-              <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">{h.desc}</p>
-            </Link>
+              <Link href={h.href} className="block transition-opacity hover:opacity-90">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--color-muted)] text-[var(--color-primary)]">
+                  <Icon className="h-5 w-5" aria-hidden />
+                </span>
+                <p className="mt-3 font-semibold">{h.title}</p>
+                <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">{h.desc}</p>
+              </Link>
+              {(h.pdf || h.xlsx) && (
+                <div className="mt-4 border-t border-[var(--color-border)] pt-3">
+                  <ReportExportActions pdfHref={h.pdf} xlsxHref={h.xlsx} />
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

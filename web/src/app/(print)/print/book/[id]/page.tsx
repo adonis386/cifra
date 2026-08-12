@@ -48,7 +48,10 @@ export default async function PrintBookPage({
 
   return (
     <div className="print-sheet">
-      <PrintToolbar backHref={`/app/books?id=${book.id}`} />
+      <PrintToolbar
+        backHref={`/app/books?id=${book.id}`}
+        xlsxHref={`/api/export/book?id=${book.id}`}
+      />
 
       <div style={{ marginBottom: 16 }}>
         <p className="print-title">{title}</p>
