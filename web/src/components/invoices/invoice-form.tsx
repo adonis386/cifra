@@ -616,9 +616,12 @@ export function InvoiceForm({
 
       <FieldError message={state.error} />
       {state.success && <p className="text-sm text-[var(--color-accent)]">{state.success}</p>}
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" disabled={pending || totals.total <= 0}>
         {pending ? "Guardando…" : "Registrar factura"}
       </Button>
+      <p className="text-xs text-[var(--color-muted-foreground)]">
+        No se permiten números de factura repetidos para el mismo tercero.
+      </p>
     </form>
   );
 }

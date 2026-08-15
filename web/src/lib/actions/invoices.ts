@@ -62,6 +62,26 @@ export async function createInvoice(
     return { error: "Con moneda USD indica la tasa del día (Bs por 1 USD)." };
   }
 
+  const supabase = await createClient();
+
+  // Evita duplicados: misma empresa + tercero + tipo + número (activas)
+  const { data: dupes } = await supabase
+    .from("invoices")
+    .select("id, invoice_date, invoice_number")
+    .eq("company_id", company.id)
+    .eq("partner_id", partnerId)
+    .eq("move_type", moveType)
+    .eq("invoice_number", invoiceNumber)
+    .neq("state", "cancelled")
+    .limit(1);
+
+  if (dupes && dupes.length > 0) {
+    const d = dupes[0];
+    return {
+      error: `Ya existe la factura ${d.invoice_number} para este tercero (${d.invoice_date}). No se puede registrar duplicada.`,
+    };
+  }
+
   const amountTax = Number(((amountUntaxed * taxRate) / 100).toFixed(2));
   const meta = moveMeta(moveType);
   let doc = meta.doc;
@@ -153,7 +173,6 @@ export async function createInvoice(
   const residual = Number((finalTotal - finalRetained).toFixed(2));
   const usdResidual = toUsd(residual, rateForUsd);
 
-  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -197,6 +216,11 @@ export async function createInvoice(
     .single();
 
   if (error) {
+    if (/duplicate|unique|23505/i.test(error.message)) {
+      return {
+        error: `Ya existe la factura ${invoiceNumber} para este tercero. No se puede registrar duplicada.`,
+      };
+    }
     // Soft fallback if migration 00008 not applied yet
     if (/column|does not exist|schema cache/i.test(error.message)) {
       const { data: legacy, error: legacyErr } = await supabase
@@ -227,7 +251,14 @@ export async function createInvoice(
         })
         .select("id")
         .single();
-      if (legacyErr) return { error: legacyErr.message };
+      if (legacyErr) {
+        if (/duplicate|unique|23505/i.test(legacyErr.message)) {
+          return {
+            error: `Ya existe la factura ${invoiceNumber} para este tercero. No se puede registrar duplicada.`,
+          };
+        }
+        return { error: legacyErr.message };
+      }
       await insertLines(supabase, legacy.id, company.id, normalized, false);
       await tryPostAccounting(legacy.id);
       revalidateAll();
