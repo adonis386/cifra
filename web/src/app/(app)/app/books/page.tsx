@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BookForm } from "@/components/books/book-form";
+import { DeleteBookButton } from "@/components/books/delete-book-button";
 import { ReportExportActions } from "@/components/report-export-actions";
 import { formatMoney, getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
@@ -61,23 +62,25 @@ export default async function BooksPage({
       </SectionCard>
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <SectionCard title="Histórico">
+        <SectionCard title="Histórico" description="Puedes borrar libros que ya no uses.">
           <div className="space-y-2">
             {(books || []).map((b) => (
-              <Link
+              <div
                 key={b.id}
-                href={`/app/books?id=${b.id}`}
-                className={`block rounded-[var(--radius-md)] border px-3 py-3 text-sm transition-colors duration-200 ${
+                className={`rounded-[var(--radius-md)] border px-3 py-3 text-sm transition-colors duration-200 ${
                   b.id === selectedId
                     ? "border-[var(--color-primary)] bg-[var(--color-muted)]"
                     : "border-[var(--color-border)] hover:bg-[var(--color-muted)]"
                 }`}
               >
-                <div className="font-semibold">{b.name}</div>
-                <div className="text-xs text-[var(--color-muted-foreground)]">
-                  {b.period_start} → {b.period_end}
-                </div>
-              </Link>
+                <Link href={`/app/books?id=${b.id}`} className="block">
+                  <div className="font-semibold">{b.name}</div>
+                  <div className="text-xs text-[var(--color-muted-foreground)]">
+                    {b.period_start} → {b.period_end}
+                  </div>
+                </Link>
+                <DeleteBookButton bookId={b.id} />
+              </div>
             ))}
             {!books?.length && (
               <EmptyState title="Sin libros" description="Genera el primero arriba." />

@@ -142,3 +142,25 @@ export async function generateFiscalBook(
   revalidatePath("/app/books");
   return { success: `Libro generado con ${lines.length} líneas.` };
 }
+
+/** Elimina un libro del histórico (líneas en cascade). */
+export async function deleteFiscalBookById(
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!id) return { ok: false, error: "Libro no indicado." };
+  const company = await getActiveCompany();
+  if (!company) return { ok: false, error: "Sin empresa activa." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("fiscal_books")
+    .delete()
+    .eq("id", id)
+    .eq("company_id", company.id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/app/books");
+  revalidatePath("/app/reports");
+  return { ok: true };
+}
