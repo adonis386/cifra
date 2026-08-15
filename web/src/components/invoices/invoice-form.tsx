@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { createInvoice, type ActionState } from "@/lib/actions/invoices";
 import { nextControlNumber } from "@/lib/actions/rates";
@@ -118,8 +118,9 @@ export function InvoiceForm({
   const [importExpediente, setImportExpediente] = useState("");
   const [importDate, setImportDate] = useState("");
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
-  const [withholdingPct, setWithholdingPct] = useState("75");
+  const [withholdingPct, setWithholdingPct] = useState("0");
   const [resetToken, setResetToken] = useState(state.success);
+  const [retencionTouched, setRetencionTouched] = useState(false);
 
   const resolvedPartnerId =
     partners.find((p) => p.id === partnerId)?.id || partners[0]?.id || "";
@@ -136,6 +137,8 @@ export function InvoiceForm({
     setImportDate("");
     setSinCred(false);
     setLines([emptyLine()]);
+    setRetencionTouched(false);
+    setWithholdingPct(moveType.startsWith("in_") ? "75" : "0");
   }
 
   const computedLines = useMemo(
@@ -152,15 +155,32 @@ export function InvoiceForm({
       tax += l.tax;
       exempt += l.exempt;
     }
-    const retained = (tax * Number(withholdingPct || 0)) / 100;
+    const effectivePct = tax <= 0 ? 0 : Number(withholdingPct || 0);
+    const retained = (tax * effectivePct) / 100;
     return {
       untaxed: Number(untaxed.toFixed(2)),
       tax: Number(tax.toFixed(2)),
       exempt: Number(exempt.toFixed(2)),
       total: Number((untaxed + tax + exempt).toFixed(2)),
       retained: Number(retained.toFixed(2)),
+      hasIva: tax > 0,
     };
   }, [computedLines, withholdingPct]);
+
+  useEffect(() => {
+    if (!totals.hasIva) {
+      if (withholdingPct !== "0") setWithholdingPct("0");
+      return;
+    }
+    if (!retencionTouched) {
+      const next = moveType.startsWith("in_") ? "75" : "0";
+      if (withholdingPct !== next) setWithholdingPct(next);
+    }
+  }, [totals.hasIva, moveType, retencionTouched, withholdingPct]);
+
+  useEffect(() => {
+    setRetencionTouched(false);
+  }, [moveType]);
 
   const primaryRate =
     computedLines.find((l) => !l.isExempt)?.rate ??
@@ -199,7 +219,11 @@ export function InvoiceForm({
       <input type="hidden" name="amount_untaxed" value={totals.untaxed} />
       <input type="hidden" name="tax_rate" value={primaryRate} />
       <input type="hidden" name="amount_exempt" value={totals.exempt} />
-      <input type="hidden" name="withholding_pct" value={withholdingPct} />
+      <input
+        type="hidden"
+        name="withholding_pct"
+        value={totals.hasIva ? withholdingPct : "0"}
+      />
       <input type="hidden" name="sin_cred" value={sinCred ? "1" : "0"} />
       <input
         type="hidden"
@@ -573,11 +597,19 @@ export function InvoiceForm({
             id="withholding_pct_ui"
             type="number"
             step="0.01"
-            value={withholdingPct}
-            onChange={(e) => setWithholdingPct(e.target.value)}
+            min="0"
+            max="100"
+            disabled={!totals.hasIva}
+            value={totals.hasIva ? withholdingPct : "0"}
+            onChange={(e) => {
+              setRetencionTouched(true);
+              setWithholdingPct(e.target.value);
+            }}
           />
           <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
-            Retiene {dual(totals.retained, rateNum)}
+            {totals.hasIva
+              ? `Retiene ${dual(totals.retained, rateNum)}`
+              : "Sin IVA (exento): retención 0%"}
           </p>
         </div>
       </div>

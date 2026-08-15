@@ -137,7 +137,8 @@ export async function createInvoice(
   const finalTax = Number((linesTax || amountTax * factor).toFixed(2));
   const finalExempt = Number((linesExempt || amountExempt * factor).toFixed(2));
   const finalTotal = Number((finalUntaxed + finalTax + finalExempt).toFixed(2));
-  const finalRetained = Number(((finalTax * withholdingPct) / 100).toFixed(2));
+  const effectiveWithholdingPct = finalTax > 0 ? withholdingPct : 0;
+  const finalRetained = Number(((finalTax * effectiveWithholdingPct) / 100).toFixed(2));
 
   const rateForUsd =
     exchangeRate && exchangeRate > 0
@@ -319,13 +320,107 @@ function revalidateAll() {
   revalidatePath("/app");
 }
 
+async function cancelInvoiceRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+  companyId: string,
+) {
+  const full = await supabase
+    .from("invoices")
+    .update({
+      state: "cancelled",
+      amount_residual: 0,
+      payment_state: "reversed",
+    })
+    .eq("id", id)
+    .eq("company_id", companyId);
+
+  // Si aún no existe el enum payment_state / columna residual
+  if (full.error) {
+    await supabase
+      .from("invoices")
+      .update({ state: "cancelled" })
+      .eq("id", id)
+      .eq("company_id", companyId);
+  }
+}
+
+/** Anula la factura (estado cancelled). No tumba la sesión si hay FKs. */
 export async function deleteInvoice(formData: FormData): Promise<void> {
   const id = String(formData.get("id") || "");
   const company = await getActiveCompany();
   if (!company || !id) return;
+
   const supabase = await createClient();
-  await supabase.from("invoices").delete().eq("id", id).eq("company_id", company.id);
+
+  try {
+    // Preferir anulación fiscal: conserva historial y evita errores de FK
+    // (retenciones, pagos, líneas de libro).
+    await cancelInvoiceRow(supabase, id, company.id);
+
+    // Intento opcional de borrado físico solo si no hay vínculos
+    const [{ count: ivaLinks }, { count: islrLinks }, { count: payLinks }, { count: bookLinks }] =
+      await Promise.all([
+        supabase
+          .from("withholding_iva_lines")
+          .select("*", { count: "exact", head: true })
+          .eq("invoice_id", id),
+        supabase
+          .from("withholding_islr_lines")
+          .select("*", { count: "exact", head: true })
+          .eq("invoice_id", id),
+        supabase
+          .from("payment_allocations")
+          .select("*", { count: "exact", head: true })
+          .eq("invoice_id", id),
+        supabase
+          .from("fiscal_book_lines")
+          .select("*", { count: "exact", head: true })
+          .eq("invoice_id", id),
+      ]);
+
+    const linked =
+      (ivaLinks || 0) + (islrLinks || 0) + (payLinks || 0) + (bookLinks || 0) > 0;
+
+    if (!linked) {
+      const { data: inv } = await supabase
+        .from("invoices")
+        .select("account_move_id")
+        .eq("id", id)
+        .eq("company_id", company.id)
+        .maybeSingle();
+
+      if (inv?.account_move_id) {
+        await supabase
+          .from("account_move_lines")
+          .delete()
+          .eq("move_id", inv.account_move_id);
+        await supabase
+          .from("invoices")
+          .update({ account_move_id: null })
+          .eq("id", id);
+        await supabase.from("account_moves").delete().eq("id", inv.account_move_id);
+      }
+
+      await supabase
+        .from("invoices")
+        .delete()
+        .eq("id", id)
+        .eq("company_id", company.id);
+      // Si el DELETE falla por FK, la factura ya quedó cancelled arriba.
+    }
+  } catch {
+    try {
+      await cancelInvoiceRow(supabase, id, company.id);
+    } catch {
+      /* never throw to the client */
+    }
+  }
+
   revalidatePath("/app/invoices");
+  revalidatePath("/app/receivables");
+  revalidatePath("/app/payables");
+  revalidatePath("/app/books");
   revalidatePath("/app");
 }
 

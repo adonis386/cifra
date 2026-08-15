@@ -48,9 +48,10 @@ export default async function InvoicesPage() {
       supabase
         .from("invoices")
         .select(
-          "id, move_type, invoice_date, invoice_number, control_number, amount_untaxed, amount_tax, amount_total, amount_retained_iva, amount_retained_islr, exchange_rate, amount_total_usd, sin_cred, currency_code, partners(name, rif)",
+          "id, move_type, state, invoice_date, invoice_number, control_number, amount_untaxed, amount_tax, amount_total, amount_retained_iva, amount_retained_islr, exchange_rate, amount_total_usd, sin_cred, currency_code, partners(name, rif)",
         )
         .eq("company_id", company.id)
+        .neq("state", "cancelled")
         .order("invoice_date", { ascending: false }),
       supabase
         .from("islr_concepts")
@@ -149,10 +150,16 @@ export default async function InvoicesPage() {
                         >
                           Imprimir
                         </Link>
-                        <form action={deleteInvoice}>
+                        <form
+                          action={deleteInvoice}
+                        >
                           <input type="hidden" name="id" value={inv.id} />
-                          <Button type="submit" variant="ghost" className="text-[var(--color-destructive)]">
-                            Eliminar
+                          <Button
+                            type="submit"
+                            variant="ghost"
+                            className="text-[var(--color-destructive)]"
+                          >
+                            Anular
                           </Button>
                         </form>
                       </div>
