@@ -1,7 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { setActiveCompanyCookie, validateRif } from "@/lib/company";
+import {
+  setActiveCompanyCookie,
+  validateEmailOptional,
+  validateRif,
+} from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 
 export type CompanyValues = {
@@ -33,10 +37,13 @@ export async function createCompany(
 ): Promise<CompanyState> {
   const values = readValues(formData);
   const name = values.name.trim();
-  const checked = validateRif(values.rif, "juridica");
+  // Empresa puede ser C.A. (J/G/C/P) o firma personal / PN (V/E)
+  const checked = validateRif(values.rif);
+  const emailCheck = validateEmailOptional(values.email);
 
   if (!name) return { error: "Nombre y RIF son obligatorios.", values };
   if (!checked.ok) return { error: checked.error, values };
+  if (!emailCheck.ok) return { error: emailCheck.error, values };
 
   const supabase = await createClient();
   const {
@@ -53,7 +60,7 @@ export async function createCompany(
       name,
       rif: checked.rif,
       address: values.address.trim() || null,
-      email: values.email.trim() || null,
+      email: emailCheck.email,
       phone: values.phone.trim() || null,
       created_by: user.id,
     })

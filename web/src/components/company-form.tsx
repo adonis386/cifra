@@ -31,14 +31,14 @@ export function CompanyForm() {
   }
 
   return (
-    <form action={action} className="mx-auto max-w-lg space-y-4">
+    <form action={action} className="mx-auto max-w-lg space-y-4" noValidate>
       <div>
-        <Label htmlFor="name">Razón social</Label>
+        <Label htmlFor="name">Razón social / Nombre</Label>
         <Input
           id="name"
           name="name"
           required
-          placeholder="Mi Empresa C.A."
+          placeholder="Adriana Peña Salazar / Mi Empresa C.A."
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
         />
@@ -49,13 +49,13 @@ export function CompanyForm() {
           id="rif"
           name="rif"
           required
-          placeholder="J-12345678-9"
+          placeholder="V-12345678-9 o J-12345678-9"
           className="font-mono"
           value={form.rif}
           onChange={(e) => set("rif", e.target.value)}
         />
         <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
-          Guiones y puntos se aceptan. Se guarda normalizado.
+          Acepta V/E (persona natural) o J/G/C/P (jurídica). Guiones opcionales.
         </p>
       </div>
       <div>
@@ -74,11 +74,16 @@ export function CompanyForm() {
           <Input
             id="email"
             name="email"
-            type="email"
-            placeholder="Opcional"
+            type="text"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="nombre@gmail.com"
             value={form.email}
-            onChange={(e) => set("email", e.target.value)}
+            onChange={(e) => set("email", e.target.value.replace(/\s+/g, ""))}
           />
+          <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+            Opcional. Sin espacios (ej. nombre@gmail.com).
+          </p>
         </div>
         <div>
           <Label htmlFor="phone">Teléfono</Label>

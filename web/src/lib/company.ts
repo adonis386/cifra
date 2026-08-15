@@ -17,10 +17,11 @@ export function normalizeRif(rif: string) {
   return rif.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
 }
 
-/** Valida RIF/cédula VE. Natural: V/E. Jurídica: J/G/C/P. */
+/** Valida RIF/cédula VE. Natural: V/E. Jurídica: J/G/C/P.
+ *  Sin personType acepta cualquiera (empresa puede ser firma personal con V/E). */
 export function validateRif(
   rifRaw: string,
-  personType?: "natural" | "juridica" | string,
+  personType?: "natural" | "juridica" | "any" | string,
 ): { ok: true; rif: string } | { ok: false; error: string } {
   const rif = normalizeRif(rifRaw);
   if (!rif) {
@@ -29,16 +30,14 @@ export function validateRif(
       error:
         personType === "natural"
           ? "Indica la cédula/RIF. Ej: V-12345678-9"
-          : "Indica el RIF. Ej: J-12345678-9",
+          : "Indica el RIF. Ej: V-12345678-9 o J-12345678-9",
     };
   }
   if (!/^[VEJPGC]\d{6,9}$/.test(rif)) {
     return {
       ok: false,
       error:
-        personType === "natural"
-          ? "Formato inválido. Persona natural: V o E + números. Ej: V-12345678-9 (guiones opcionales)"
-          : "Formato inválido. Ej: J-12345678-9 (guiones y puntos se aceptan)",
+        "Formato inválido. Usa V/E (natural) o J/G/C/P (jurídica). Ej: V-12345678-9",
     };
   }
   if (personType === "natural" && !/^[VE]/.test(rif)) {
@@ -54,6 +53,22 @@ export function validateRif(
     };
   }
   return { ok: true, rif };
+}
+
+/** Quita espacios y normaliza correo (evita gmail .com del teclado). */
+export function normalizeEmail(email: string) {
+  return email.replace(/\s+/g, "").trim().toLowerCase();
+}
+
+export function validateEmailOptional(
+  emailRaw: string,
+): { ok: true; email: string | null } | { ok: false; error: string } {
+  const email = normalizeEmail(emailRaw);
+  if (!email) return { ok: true, email: null };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "Correo inválido. Ej: nombre@gmail.com (sin espacios)" };
+  }
+  return { ok: true, email };
 }
 
 export function formatMoney(n: number | string | null | undefined) {
