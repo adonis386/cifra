@@ -345,20 +345,19 @@ async function cancelInvoiceRow(
   }
 }
 
-/** Anula la factura (estado cancelled). No tumba la sesión si hay FKs. */
-export async function deleteInvoice(formData: FormData): Promise<void> {
-  const id = String(formData.get("id") || "");
+/** Anula la factura (estado cancelled). Seguro ante FKs. */
+export async function cancelInvoiceById(
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!id) return { ok: false, error: "Factura no indicada." };
   const company = await getActiveCompany();
-  if (!company || !id) return;
+  if (!company) return { ok: false, error: "Sin empresa activa." };
 
   const supabase = await createClient();
 
   try {
-    // Preferir anulación fiscal: conserva historial y evita errores de FK
-    // (retenciones, pagos, líneas de libro).
     await cancelInvoiceRow(supabase, id, company.id);
 
-    // Intento opcional de borrado físico solo si no hay vínculos
     const [{ count: ivaLinks }, { count: islrLinks }, { count: payLinks }, { count: bookLinks }] =
       await Promise.all([
         supabase
@@ -407,13 +406,12 @@ export async function deleteInvoice(formData: FormData): Promise<void> {
         .delete()
         .eq("id", id)
         .eq("company_id", company.id);
-      // Si el DELETE falla por FK, la factura ya quedó cancelled arriba.
     }
   } catch {
     try {
       await cancelInvoiceRow(supabase, id, company.id);
     } catch {
-      /* never throw to the client */
+      return { ok: false, error: "No se pudo anular la factura." };
     }
   }
 
@@ -422,6 +420,12 @@ export async function deleteInvoice(formData: FormData): Promise<void> {
   revalidatePath("/app/payables");
   revalidatePath("/app/books");
   revalidatePath("/app");
+  return { ok: true };
+}
+
+/** @deprecated Prefer cancel via /api/invoices/cancel to avoid stale Server Action IDs. */
+export async function deleteInvoice(formData: FormData): Promise<void> {
+  await cancelInvoiceById(String(formData.get("id") || ""));
 }
 
 export { periodFromDate };

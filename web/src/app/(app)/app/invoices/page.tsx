@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
+import { CancelInvoiceButton } from "@/components/invoices/cancel-invoice-button";
 import { ReportExportActions } from "@/components/report-export-actions";
-import { deleteInvoice } from "@/lib/actions/invoices";
 import {
   formatDual,
   formatMoney,
@@ -9,7 +9,6 @@ import {
   getExchangeRate,
 } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui";
 import {
   Badge,
   DataTable,
@@ -150,18 +149,7 @@ export default async function InvoicesPage() {
                         >
                           Imprimir
                         </Link>
-                        <form
-                          action={deleteInvoice}
-                        >
-                          <input type="hidden" name="id" value={inv.id} />
-                          <Button
-                            type="submit"
-                            variant="ghost"
-                            className="text-[var(--color-destructive)]"
-                          >
-                            Anular
-                          </Button>
-                        </form>
+                        <CancelInvoiceButton invoiceId={inv.id} />
                       </div>
                     </Td>
                   </tr>
