@@ -24,8 +24,8 @@ type BookInvoice = {
   amount_retained_iva: number;
   sin_cred?: boolean;
   partners:
-    | { name: string; rif: string }
-    | { name: string; rif: string }[]
+    | { name: string; rif: string; person_type?: string }
+    | { name: string; rif: string; person_type?: string }[]
     | null;
 };
 
@@ -154,7 +154,7 @@ export async function generateFiscalBook(
     const res = await supabase
       .from("invoices")
       .select(
-        "id, invoice_date, registration_date, invoice_number, control_number, doc_type, move_type, affected_document, import_planilla, import_file_number, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva, sin_cred, partners(name, rif)",
+        "id, invoice_date, registration_date, invoice_number, control_number, doc_type, move_type, affected_document, import_planilla, import_file_number, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva, sin_cred, partners(name, rif, person_type)",
       )
       .eq("company_id", company.id)
       .in("move_type", moveTypes)
@@ -266,6 +266,11 @@ export async function generateFiscalBook(
     const split = splitAliquots(inv, taxLines);
     const isImport = Boolean(inv.import_planilla || inv.import_file_number);
     const voucher = voucherByInvoice.get(inv.id);
+    const rifLetter = String(p?.rif || "").replace(/[^A-Za-z]/g, "").charAt(0).toUpperCase();
+    const personType =
+      p?.person_type === "natural" || rifLetter === "V" || rifLetter === "E"
+        ? "natural"
+        : "juridica";
 
     let base_import = 0;
     let tax_import = 0;
@@ -277,8 +282,48 @@ export async function generateFiscalBook(
     let base_additional = split.base_additional;
     let tax_additional = split.tax_additional;
 
-    if (isImport) {
-      // Importaciones → columnas ET; internas en 0
+    // Ventas Art. 76: CO = jurídico; NO = natural
+    let base_natural = 0;
+    let tax_natural = 0;
+    let rate_natural = 16;
+    let base_natural_reduced = 0;
+    let tax_natural_reduced = 0;
+    let base_natural_additional = 0;
+    let tax_natural_additional = 0;
+    let amount_export = 0;
+    let amount_exonerated = 0;
+    const amount_exempt = split.amount_exempt;
+
+    if (bookType === "sale") {
+      if (buckets.doc_type === "04" || inv.import_file_number) {
+        amount_export =
+          split.base_general +
+          split.base_reduced +
+          split.base_additional +
+          split.amount_exempt;
+        base_general = 0;
+        tax_general = 0;
+        base_reduced = 0;
+        tax_reduced = 0;
+        base_additional = 0;
+        tax_additional = 0;
+      } else if (personType === "natural") {
+        base_natural = split.base_general;
+        tax_natural = split.tax_general;
+        rate_natural = split.rate_general;
+        base_natural_reduced = split.base_reduced;
+        tax_natural_reduced = split.tax_reduced;
+        base_natural_additional = split.base_additional;
+        tax_natural_additional = split.tax_additional;
+        base_general = 0;
+        tax_general = 0;
+        base_reduced = 0;
+        tax_reduced = 0;
+        base_additional = 0;
+        tax_additional = 0;
+      }
+      // jurídico queda en CO (base_general/reduced/additional)
+    } else if (isImport) {
       base_import =
         split.base_general + split.base_reduced + split.base_additional;
       tax_import =
@@ -292,6 +337,15 @@ export async function generateFiscalBook(
       tax_additional = 0;
     }
 
+    const docLabel =
+      buckets.doc_type === "03"
+        ? "NC"
+        : buckets.doc_type === "02"
+          ? "ND"
+          : bookType === "sale"
+            ? "FACT"
+            : buckets.doc_type;
+
     return {
       book_id: book.id,
       company_id: company.id,
@@ -301,9 +355,13 @@ export async function generateFiscalBook(
       registration_date: regDate,
       partner_rif: p?.rif || "",
       partner_name: p?.name || "",
+      partner_person_type: personType,
       invoice_number: buckets.documento || inv.invoice_number,
       control_number: inv.control_number,
-      doc_type: buckets.doc_type,
+      machine_serial: bookType === "sale" ? inv.control_number || null : null,
+      z_number: bookType === "sale" ? inv.control_number || null : null,
+      export_file: inv.import_file_number || null,
+      doc_type: bookType === "sale" ? docLabel : buckets.doc_type,
       move_type: inv.move_type,
       debit_note: buckets.debit_note,
       credit_note: buckets.credit_note,
@@ -313,7 +371,9 @@ export async function generateFiscalBook(
       import_file_number: inv.import_file_number || null,
       amount_untaxed: Number(inv.amount_untaxed || 0),
       amount_tax: Number(inv.amount_tax || 0),
-      amount_exempt: split.amount_exempt,
+      amount_exempt,
+      amount_exonerated,
+      amount_export,
       amount_total: Number(inv.amount_total || 0),
       amount_retained: Number(inv.amount_retained_iva || 0),
       base_general,
@@ -328,6 +388,13 @@ export async function generateFiscalBook(
       base_import,
       tax_import,
       rate_import,
+      base_natural,
+      tax_natural,
+      rate_natural,
+      base_natural_reduced,
+      tax_natural_reduced,
+      base_natural_additional,
+      tax_natural_additional,
       igtf_amount: 0,
       igtf_rate: 0,
       voucher_number: voucher?.voucher_number || null,

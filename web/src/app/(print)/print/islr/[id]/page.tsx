@@ -1,7 +1,14 @@
 import { notFound } from "next/navigation";
+import type { CSSProperties } from "react";
 import { PrintToolbar } from "@/components/print/print-toolbar";
 import { formatMoney, getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+
+function fmtDate(d: string) {
+  if (!d) return "—";
+  const [y, m, day] = d.split("-");
+  return y && m && day ? `${day}/${m}/${y}` : d;
+}
 
 export default async function PrintIslrPage({
   params,
@@ -22,7 +29,7 @@ export default async function PrintIslrPage({
     supabase
       .from("withholding_islr")
       .select(
-        "id, voucher_number, period, voucher_date, amount_untaxed, amount_withheld, partners(name, rif, address, phone), withholding_islr_lines(amount_untaxed, amount_withheld, rate, concept_id, islr_concepts(code, name), invoices(invoice_number, control_number, invoice_date))",
+        "id, voucher_number, period, voucher_date, amount_untaxed, amount_withheld, partners(name, rif, address, phone, person_type), withholding_islr_lines(amount_untaxed, amount_withheld, rate, concept_id, islr_concepts(code, name), invoices(invoice_number, control_number, invoice_date))",
       )
       .eq("id", id)
       .eq("company_id", company.id)
@@ -32,8 +39,20 @@ export default async function PrintIslrPage({
   if (!wh) notFound();
 
   const partner = wh.partners as unknown as
-    | { name: string; rif: string; address: string | null; phone: string | null }
-    | { name: string; rif: string; address: string | null; phone: string | null }[]
+    | {
+        name: string;
+        rif: string;
+        address: string | null;
+        phone: string | null;
+        person_type?: string;
+      }
+    | {
+        name: string;
+        rif: string;
+        address: string | null;
+        phone: string | null;
+        person_type?: string;
+      }[]
     | null;
   const p = Array.isArray(partner) ? partner[0] : partner;
   const lines = (wh.withholding_islr_lines || []) as Array<{
@@ -47,75 +66,107 @@ export default async function PrintIslrPage({
       | null;
   }>;
 
-  const periodLabel = `${wh.period.slice(4, 6)}/${wh.period.slice(0, 4)}`;
+  const box: CSSProperties = {
+    border: "1px solid #222",
+    padding: "6px 8px",
+  };
+  const personLabel =
+    p?.person_type === "natural" ? "Natural" : "Jurídica";
 
   return (
-    <div className="print-sheet">
+    <div className="print-sheet" style={{ fontSize: 11 }}>
       <PrintToolbar backHref="/app/withholdings" />
 
-      <p className="print-title" style={{ marginBottom: 16 }}>
-        Comprobante de Retención de ISLR {wh.voucher_number}
-      </p>
-
-      <table className="print-box" style={{ marginBottom: 14 }}>
+      <table style={{ width: "100%", marginBottom: 10 }}>
         <tbody>
           <tr>
-            <td>
-              <div style={{ fontSize: 10 }}>Agente de Retención</div>
-              <strong>{fullCompany?.name}</strong>
+            <td style={{ width: "70%" }}>
+              <p
+                style={{
+                  fontWeight: 700,
+                  fontSize: 15,
+                  margin: 0,
+                  textAlign: "center",
+                }}
+              >
+                Comprobante de Retención de Impuesto sobre la Renta
+              </p>
+              <p
+                style={{
+                  fontSize: 10,
+                  textAlign: "center",
+                  margin: "6px 0 0",
+                }}
+              >
+                SEGÚN GACETA DECRETO 1808 DEL 12/05/1997
+              </p>
             </td>
-            <td>
-              <div style={{ fontSize: 10 }}>RIF Agente</div>
-              <strong>{fullCompany?.rif}</strong>
-            </td>
-            <td>
-              <div style={{ fontSize: 10 }}>Período</div>
-              <strong>{periodLabel}</strong>
-            </td>
-          </tr>
-          <tr>
-            <td colSpan={3}>
-              <div style={{ fontSize: 10 }}>Dirección fiscal del agente</div>
-              {fullCompany?.address || "—"}
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <div style={{ fontSize: 10 }}>Sujeto retenido</div>
-              <strong>{p?.name}</strong>
-            </td>
-            <td>
-              <div style={{ fontSize: 10 }}>RIF retenido</div>
-              <strong>{p?.rif}</strong>
-            </td>
-            <td>
-              <div style={{ fontSize: 10 }}>Fecha</div>
-              <strong>{wh.voucher_date}</strong>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <div style={{ fontSize: 10 }}>Dirección retenido</div>
-              {p?.address || "—"}
-            </td>
-            <td colSpan={2}>
-              <div style={{ fontSize: 10 }}>Teléfono</div>
-              {p?.phone || "—"}
+            <td style={{ ...box, verticalAlign: "top" }}>
+              <div style={{ fontSize: 9 }}>DÍA MES AÑO</div>
+              <strong>{fmtDate(wh.voucher_date)}</strong>
+              <div style={{ fontSize: 9, marginTop: 8 }}>No. Comprobante</div>
+              <strong style={{ fontFamily: "monospace" }}>{wh.voucher_number}</strong>
             </td>
           </tr>
         </tbody>
       </table>
 
-      <table className="print-table">
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 10 }}>
+        <tbody>
+          <tr>
+            <td colSpan={2} style={{ ...box, background: "#f3f3f3", fontWeight: 700 }}>
+              AGENTE DE RETENCIÓN
+            </td>
+          </tr>
+          <tr>
+            <td style={{ ...box, width: "45%" }}>
+              <div style={{ fontSize: 9 }}>Empresa:</div>
+              <strong>{fullCompany?.name}</strong>
+              <div style={{ marginTop: 6, fontSize: 9 }}>
+                R.I.F.: <strong style={{ fontFamily: "monospace" }}>{fullCompany?.rif}</strong>
+              </div>
+            </td>
+            <td style={box}>
+              <div style={{ fontSize: 9 }}>Dirección:</div>
+              {fullCompany?.address || "—"}
+              <div style={{ marginTop: 6, fontSize: 9 }}>
+                Teléfono: {fullCompany?.phone || "—"}
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td colSpan={2} style={{ ...box, background: "#f3f3f3", fontWeight: 700 }}>
+              CONTRIBUYENTE
+            </td>
+          </tr>
+          <tr>
+            <td style={box}>
+              <div style={{ fontSize: 9 }}>Persona: {personLabel}</div>
+              <div style={{ fontSize: 9, marginTop: 4 }}>Razón Social:</div>
+              <strong>{p?.name}</strong>
+            </td>
+            <td style={box}>
+              <div style={{ fontSize: 9 }}>Dirección:</div>
+              {p?.address || "—"}
+              <div style={{ marginTop: 6, fontSize: 9 }}>
+                R.I.F.: <strong style={{ fontFamily: "monospace" }}>{p?.rif}</strong>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table className="print-table" style={{ fontSize: 10 }}>
         <thead>
           <tr>
-            <th>Fecha factura</th>
-            <th>Nº Factura</th>
-            <th>Nº Control</th>
-            <th>Concepto</th>
-            <th>Base</th>
-            <th>% Ret.</th>
-            <th>ISLR retenido</th>
+            <th>Número Documento</th>
+            <th>Número control</th>
+            <th>Fecha Documento</th>
+            <th>Descripción</th>
+            <th>% Alícuota</th>
+            <th>Base Imponible</th>
+            <th>Sustraendo (1)</th>
+            <th>Impuesto retenido Bs. (2)</th>
           </tr>
         </thead>
         <tbody>
@@ -126,38 +177,53 @@ export default async function PrintIslrPage({
             const inv = Array.isArray(l.invoices) ? l.invoices[0] : l.invoices;
             return (
               <tr key={i}>
-                <td>{inv?.invoice_date || wh.voucher_date}</td>
                 <td>{inv?.invoice_number || "—"}</td>
                 <td>{inv?.control_number || "—"}</td>
+                <td>{fmtDate(inv?.invoice_date || wh.voucher_date)}</td>
                 <td>
-                  {concept?.code || "—"} {concept?.name || ""}
+                  {concept?.name || concept?.code || "SERVICIOS"}
                 </td>
-                <td style={{ textAlign: "right" }}>{formatMoney(l.amount_untaxed)}</td>
                 <td style={{ textAlign: "right" }}>{Number(l.rate).toFixed(2)}</td>
+                <td style={{ textAlign: "right" }}>{formatMoney(l.amount_untaxed)}</td>
+                <td style={{ textAlign: "right" }}>{formatMoney(0)}</td>
                 <td style={{ textAlign: "right" }}>{formatMoney(l.amount_withheld)}</td>
               </tr>
             );
           })}
         </tbody>
-        <tfoot>
+      </table>
+
+      <table style={{ width: "100%", marginTop: 14, maxWidth: 420, marginLeft: "auto" }}>
+        <tbody>
           <tr>
-            <td colSpan={4} style={{ textAlign: "right", fontWeight: 700 }}>
-              Totales
-            </td>
-            <td style={{ textAlign: "right", fontWeight: 700 }}>
+            <td style={{ padding: "4px 8px" }}>Total Base Imponible Bs.</td>
+            <td style={{ textAlign: "right", fontWeight: 700, padding: "4px 8px" }}>
               {formatMoney(wh.amount_untaxed)}
             </td>
-            <td />
-            <td style={{ textAlign: "right", fontWeight: 700 }}>
+          </tr>
+          <tr>
+            <td style={{ padding: "4px 8px" }}>Total Retenido al Proveedor Bs.:</td>
+            <td style={{ textAlign: "right", fontWeight: 700, padding: "4px 8px" }}>
               {formatMoney(wh.amount_withheld)}
             </td>
           </tr>
-        </tfoot>
+        </tbody>
       </table>
 
-      <p style={{ marginTop: 28, fontSize: 11 }}>
-        Emitido por Cifra · {fullCompany?.name} · {fullCompany?.rif}
-      </p>
+      <div
+        style={{
+          marginTop: 48,
+          borderTop: "1px solid #222",
+          paddingTop: 8,
+          maxWidth: 320,
+          marginLeft: "auto",
+          textAlign: "center",
+          fontSize: 10,
+        }}
+      >
+        FIRMA Y SELLO DEL AGENTE DE RETENCIÓN
+        <div style={{ marginTop: 8, fontWeight: 600 }}>{fullCompany?.name}</div>
+      </div>
     </div>
   );
 }

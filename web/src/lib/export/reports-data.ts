@@ -298,15 +298,66 @@ export async function loadFiscalBook(bookId: string) {
     .eq("book_id", book.id)
     .order("rank");
 
+  const isSale = book.book_type === "sale";
+
   const rows = (lines || []).map((l) => {
-    const baseG = Number(l.base_general ?? l.amount_untaxed ?? 0);
-    const taxG = Number(l.tax_general ?? l.amount_tax ?? 0);
+    const baseG = Number(l.base_general ?? (!isSale ? l.amount_untaxed : 0) ?? 0);
+    const taxG = Number(l.tax_general ?? (!isSale ? l.amount_tax : 0) ?? 0);
     const baseR = Number(l.base_reduced ?? 0);
     const taxR = Number(l.tax_reduced ?? 0);
     const baseA = Number(l.base_additional ?? 0);
     const taxA = Number(l.tax_additional ?? 0);
     const baseI = Number(l.base_import ?? 0);
     const taxI = Number(l.tax_import ?? 0);
+    const baseN = Number(l.base_natural ?? 0);
+    const taxN = Number(l.tax_natural ?? 0);
+    const baseNr = Number(l.base_natural_reduced ?? 0);
+    const taxNr = Number(l.tax_natural_reduced ?? 0);
+    const baseNa = Number(l.base_natural_additional ?? 0);
+    const taxNa = Number(l.tax_natural_additional ?? 0);
+
+    if (isSale) {
+      return {
+        nro_op: l.rank,
+        fecha_emision: l.emission_date,
+        tipo_doc: l.doc_type,
+        documento: l.invoice_number,
+        nota_debito: l.debit_note || "",
+        nota_credito: l.credit_note || "",
+        factura_afectada: l.affected_document || "",
+        serial_maq_fiscal: l.machine_serial || l.control_number || "",
+        numero_z: l.z_number || "",
+        razon_social: l.partner_name,
+        rif: l.partner_rif,
+        exp_exportacion: l.export_file || "",
+        total_con_iva: Number(l.amount_total),
+        exoneradas: Number(l.amount_exonerated || 0),
+        total_exportacion: Number(l.amount_export || 0),
+        ventas_exentas: Number(l.amount_exempt),
+        co_base_16: baseG,
+        co_pct_16: Number(l.rate_general || 0) || (taxG > 0 ? 16 : 0),
+        co_imp_16: taxG,
+        co_base_8: baseR,
+        co_pct_8: Number(l.rate_reduced || 0) || (taxR > 0 ? 8 : 0),
+        co_imp_8: taxR,
+        co_base_31: baseA,
+        co_pct_31: Number(l.rate_additional || 0) || (taxA > 0 ? 31 : 0),
+        co_imp_31: taxA,
+        no_base: baseN,
+        venta_exenta: Number(l.amount_exempt),
+        no_pct: Number(l.rate_natural || 0) || (taxN > 0 ? 16 : 0),
+        no_impuesto: taxN,
+        no_base_8: baseNr,
+        no_pct_8: taxNr > 0 ? 8 : 0,
+        no_imp_8: taxNr,
+        no_base_31: baseNa,
+        no_pct_31: taxNa > 0 ? 31 : 0,
+        no_imp_31: taxNa,
+        retencion_iva: Number(l.amount_retained),
+        comp_retencion_iva: l.voucher_number || "",
+      };
+    }
+
     return {
       nro_op: l.rank,
       fecha_emision: l.emission_date,

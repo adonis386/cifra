@@ -52,7 +52,7 @@ export default async function BooksPage({
       <PageHeader
         eyebrow="SENIAT · Art. 75"
         title="Libros fiscales"
-        description="Libro de compras y ventas según Art. 75 del Reglamento de IVA (alícuotas 16/8/31, NC/ND, retención)."
+        description="Libro de compras (Art. 75) y ventas (Art. 76) del Reglamento de IVA."
       />
 
       <SectionCard title="Generar período">
