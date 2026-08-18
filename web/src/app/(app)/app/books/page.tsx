@@ -42,9 +42,7 @@ export default async function BooksPage({
   const { data: lines } = selectedId
     ? await supabase
         .from("fiscal_book_lines")
-        .select(
-          "rank, emission_date, partner_rif, partner_name, invoice_number, control_number, doc_type, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained",
-        )
+        .select("*")
         .eq("book_id", selectedId)
         .order("rank")
     : { data: [] };
@@ -52,9 +50,9 @@ export default async function BooksPage({
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="SENIAT"
+        eyebrow="SENIAT · Art. 75"
         title="Libros fiscales"
-        description="Libro de compras y ventas generado desde facturas del período."
+        description="Libro de compras y ventas según Art. 75 del Reglamento de IVA (alícuotas 16/8/31, NC/ND, retención)."
       />
 
       <SectionCard title="Generar período">
@@ -92,7 +90,7 @@ export default async function BooksPage({
           title="Detalle del libro"
           description={
             selectedId
-              ? "Vista en pantalla. Exporta PDF (impresión) o Excel."
+              ? "Vista resumida. Usa Imprimir/PDF o Excel para el formato completo Art. 75."
               : undefined
           }
         >
@@ -105,36 +103,64 @@ export default async function BooksPage({
             </div>
           )}
           {(lines || []).length ? (
-            <DataTable>
-              <thead>
-                <tr>
-                  <Th>#</Th>
-                  <Th>Fecha</Th>
-                  <Th>RIF</Th>
-                  <Th>Nombre</Th>
-                  <Th>Factura</Th>
-                  <Th>Control</Th>
-                  <Th className="text-right">Base</Th>
-                  <Th className="text-right">IVA</Th>
-                  <Th className="text-right">Total</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {(lines || []).map((l) => (
-                  <tr key={`${l.rank}-${l.invoice_number}`}>
-                    <Td>{l.rank}</Td>
-                    <Td className="whitespace-nowrap">{l.emission_date}</Td>
-                    <Td className="font-mono text-xs">{l.partner_rif}</Td>
-                    <Td>{l.partner_name}</Td>
-                    <Td>{l.invoice_number}</Td>
-                    <Td className="font-mono text-xs">{l.control_number}</Td>
-                    <Td className="text-right font-mono text-xs">{formatMoney(l.amount_untaxed)}</Td>
-                    <Td className="text-right font-mono text-xs">{formatMoney(l.amount_tax)}</Td>
-                    <Td className="text-right font-mono text-xs font-semibold">{formatMoney(l.amount_total)}</Td>
+            <div className="overflow-x-auto">
+              <DataTable>
+                <thead>
+                  <tr>
+                    <Th>#</Th>
+                    <Th>Fecha</Th>
+                    <Th>Tipo</Th>
+                    <Th>Doc / NC / ND</Th>
+                    <Th>RIF</Th>
+                    <Th>Nombre</Th>
+                    <Th className="text-right">Total</Th>
+                    <Th className="text-right">Exento</Th>
+                    <Th className="text-right">Base 16%</Th>
+                    <Th className="text-right">IVA 16%</Th>
+                    <Th className="text-right">Base 8%</Th>
+                    <Th className="text-right">IVA 8%</Th>
+                    <Th className="text-right">Ret. IVA</Th>
                   </tr>
-                ))}
-              </tbody>
-            </DataTable>
+                </thead>
+                <tbody>
+                  {(lines || []).map((l) => {
+                    const doc =
+                      l.credit_note || l.debit_note || l.invoice_number || "—";
+                    return (
+                      <tr key={`${l.rank}-${l.invoice_number}`}>
+                        <Td>{l.rank}</Td>
+                        <Td className="whitespace-nowrap">{l.emission_date}</Td>
+                        <Td>{l.doc_type}</Td>
+                        <Td className="font-mono text-xs">{doc}</Td>
+                        <Td className="font-mono text-xs">{l.partner_rif}</Td>
+                        <Td>{l.partner_name}</Td>
+                        <Td className="text-right font-mono text-xs font-semibold">
+                          {formatMoney(l.amount_total)}
+                        </Td>
+                        <Td className="text-right font-mono text-xs">
+                          {formatMoney(l.amount_exempt)}
+                        </Td>
+                        <Td className="text-right font-mono text-xs">
+                          {formatMoney(Number(l.base_general ?? l.amount_untaxed))}
+                        </Td>
+                        <Td className="text-right font-mono text-xs">
+                          {formatMoney(Number(l.tax_general ?? l.amount_tax))}
+                        </Td>
+                        <Td className="text-right font-mono text-xs">
+                          {formatMoney(Number(l.base_reduced || 0))}
+                        </Td>
+                        <Td className="text-right font-mono text-xs">
+                          {formatMoney(Number(l.tax_reduced || 0))}
+                        </Td>
+                        <Td className="text-right font-mono text-xs">
+                          {formatMoney(l.amount_retained)}
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </DataTable>
+            </div>
           ) : (
             <EmptyState title="Sin líneas" description="Selecciona o genera un libro." />
           )}

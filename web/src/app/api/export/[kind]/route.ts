@@ -168,22 +168,38 @@ export async function GET(
         if (!id) return new Response("Falta id", { status: 400 });
         const data = await loadFiscalBook(id);
         if (!data) return new Response("No encontrado", { status: 404 });
+        const sheetName =
+          data.book.book_type === "sale" ? "Libro ventas Art75" : "Libro compras Art75";
         const buf = buildXlsxBuffer([
           {
-            name: data.book.book_type === "sale" ? "Libro ventas" : "Libro compras",
+            name: sheetName,
             rows: data.rows.map((r) => ({
-              Nro: r.nro,
-              Fecha: r.fecha,
+              "N° Operacion": r.nro_op,
+              "Fecha Emisión": r.fecha_emision,
+              "Tipo Doc.": r.tipo_doc,
+              Documento: r.documento,
+              "No. Nota Débito": r.nota_debito,
+              "No. Nota Crédito": r.nota_credito,
+              "Factura Afectada": r.factura_afectada,
+              "No. Control": r.nro_control,
+              "Razón Social": r.razon_social,
               RIF: r.rif,
-              Nombre: r.nombre,
-              Factura: r.factura,
-              Control: r.control,
-              Tipo: r.tipo,
-              Base: r.base,
-              IVA: r.iva,
-              Exento: r.exento,
-              Total: r.total,
-              Ret_IVA: r.ret_iva,
+              "Total + Impuesto": r.total_con_iva,
+              "Exento / SDCF": r.exento_sdcf,
+              "ET Base Imponible": r.et_base,
+              "ET (%)": r.et_pct,
+              "ET Impuesto": r.et_impuesto,
+              "NA Base 16%": r.na_base_16,
+              "NA (%) 16": r.na_pct_16,
+              "NA Impuesto 16%": r.na_imp_16,
+              "NA Base 8%": r.na_base_8,
+              "NA (%) 8": r.na_pct_8,
+              "NA Impuesto 8%": r.na_imp_8,
+              "NA Base 31%": r.na_base_31,
+              "NA (%) 31": r.na_pct_31,
+              "NA Impuesto 31%": r.na_imp_31,
+              "Comp. Retención IVA": r.comp_retencion_iva,
+              "IVA Retenido": r.iva_retenido,
             })),
           },
         ]);

@@ -294,26 +294,48 @@ export async function loadFiscalBook(bookId: string) {
 
   const { data: lines } = await ctx.supabase
     .from("fiscal_book_lines")
-    .select(
-      "rank, emission_date, partner_rif, partner_name, invoice_number, control_number, doc_type, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained",
-    )
+    .select("*")
     .eq("book_id", book.id)
     .order("rank");
 
-  const rows = (lines || []).map((l) => ({
-    nro: l.rank,
-    fecha: l.emission_date,
-    rif: l.partner_rif,
-    nombre: l.partner_name,
-    factura: l.invoice_number,
-    control: l.control_number || "",
-    tipo: l.doc_type,
-    base: Number(l.amount_untaxed),
-    iva: Number(l.amount_tax),
-    exento: Number(l.amount_exempt),
-    total: Number(l.amount_total),
-    ret_iva: Number(l.amount_retained),
-  }));
+  const rows = (lines || []).map((l) => {
+    const baseG = Number(l.base_general ?? l.amount_untaxed ?? 0);
+    const taxG = Number(l.tax_general ?? l.amount_tax ?? 0);
+    const baseR = Number(l.base_reduced ?? 0);
+    const taxR = Number(l.tax_reduced ?? 0);
+    const baseA = Number(l.base_additional ?? 0);
+    const taxA = Number(l.tax_additional ?? 0);
+    const baseI = Number(l.base_import ?? 0);
+    const taxI = Number(l.tax_import ?? 0);
+    return {
+      nro_op: l.rank,
+      fecha_emision: l.emission_date,
+      tipo_doc: l.doc_type,
+      documento: l.invoice_number,
+      nota_debito: l.debit_note || "",
+      nota_credito: l.credit_note || "",
+      factura_afectada: l.affected_document || "",
+      nro_control: l.control_number || "",
+      razon_social: l.partner_name,
+      rif: l.partner_rif,
+      total_con_iva: Number(l.amount_total),
+      exento_sdcf: Number(l.amount_exempt),
+      et_base: baseI,
+      et_pct: Number(l.rate_import || 0) || (taxI > 0 ? 16 : 0),
+      et_impuesto: taxI,
+      na_base_16: baseG,
+      na_pct_16: Number(l.rate_general || 0) || (taxG > 0 ? 16 : 0),
+      na_imp_16: taxG,
+      na_base_8: baseR,
+      na_pct_8: Number(l.rate_reduced || 0) || (taxR > 0 ? 8 : 0),
+      na_imp_8: taxR,
+      na_base_31: baseA,
+      na_pct_31: Number(l.rate_additional || 0) || (taxA > 0 ? 31 : 0),
+      na_imp_31: taxA,
+      comp_retencion_iva: l.voucher_number || "",
+      iva_retenido: Number(l.amount_retained),
+    };
+  });
 
   return { ...ctx, book, rows };
 }

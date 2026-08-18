@@ -43,8 +43,10 @@ export function BookForm() {
           {pending ? "Generando…" : "Generar libro desde facturas"}
         </Button>
         <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
-          El rango filtra por <strong>fecha de registro</strong> de la factura
-          (no la fecha del documento), para quincenas de contribuyentes especiales.
+          Formato SENIAT Art. 75 (compras/ventas). El rango filtra por{" "}
+          <strong>fecha de registro</strong> de la factura (útil para quincenas de
+          contribuyentes especiales). Regenera el libro tras aplicar la migración
+          SQL 000015.
         </p>
       </div>
     </form>
