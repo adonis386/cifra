@@ -38,6 +38,8 @@ export async function createInvoice(
   const partnerId = String(formData.get("partner_id") || "");
   const moveType = String(formData.get("move_type") || "in_invoice");
   const invoiceDate = String(formData.get("invoice_date") || "");
+  const registrationDate =
+    String(formData.get("registration_date") || "").trim() || invoiceDate;
   const invoiceNumber = String(formData.get("invoice_number") || "").trim();
   const controlNumber = String(formData.get("control_number") || "").trim();
   const affectedDocument = String(formData.get("affected_document") || "").trim();
@@ -65,20 +67,24 @@ export async function createInvoice(
   const supabase = await createClient();
 
   // Evita duplicados: misma empresa + tercero + tipo + número (activas)
+  const normalizedNumber = invoiceNumber.trim();
   const { data: dupes } = await supabase
     .from("invoices")
     .select("id, invoice_date, invoice_number")
     .eq("company_id", company.id)
     .eq("partner_id", partnerId)
     .eq("move_type", moveType)
-    .eq("invoice_number", invoiceNumber)
     .neq("state", "cancelled")
-    .limit(1);
+    .limit(50);
 
-  if (dupes && dupes.length > 0) {
-    const d = dupes[0];
+  const dup = (dupes || []).find(
+    (d) =>
+      String(d.invoice_number || "").trim().toLowerCase() ===
+      normalizedNumber.toLowerCase(),
+  );
+  if (dup) {
     return {
-      error: `Ya existe la factura ${d.invoice_number} para este tercero (${d.invoice_date}). No se puede registrar duplicada.`,
+      error: `Ya existe la factura ${dup.invoice_number} para este proveedor/cliente (${dup.invoice_date}). No se puede registrar duplicada.`,
     };
   }
 
@@ -177,6 +183,56 @@ export async function createInvoice(
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Retención ISLR estimada según conceptos en líneas
+  let finalRetainedIslr = 0;
+  const conceptIds = [
+    ...new Set(normalized.map((l) => l.concept_id).filter(Boolean) as string[]),
+  ];
+  if (conceptIds.length) {
+    const [{ data: partner }, { data: rates }, { data: ut }] = await Promise.all([
+      supabase
+        .from("partners")
+        .select("person_type")
+        .eq("id", partnerId)
+        .maybeSingle(),
+      supabase
+        .from("islr_rates")
+        .select("concept_id, person_type, rate, base_percent, subtract_ut")
+        .in("concept_id", conceptIds)
+        .eq("active", true),
+      supabase
+        .from("tax_units")
+        .select("amount")
+        .or(`company_id.eq.${company.id},company_id.is.null`)
+        .order("date_from", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const personType = partner?.person_type === "natural" ? "natural" : "juridica";
+    const utAmount = Number(ut?.amount || 0);
+    for (const line of normalized) {
+      if (!line.concept_id) continue;
+      const rate =
+        (rates || []).find(
+          (r) => r.concept_id === line.concept_id && r.person_type === personType,
+        ) ||
+        (rates || []).find((r) => r.concept_id === line.concept_id);
+      if (!rate) continue;
+      const base = Number(line.untaxed || line.exempt || 0);
+      const basePct = Number(rate.base_percent || 100) / 100;
+      const subtract = Number(rate.subtract_ut || 0) * utAmount;
+      const taxable = Math.max(base * basePct - subtract, 0);
+      finalRetainedIslr += Number(
+        ((taxable * Number(rate.rate || 0)) / 100).toFixed(2),
+      );
+    }
+    finalRetainedIslr = Number(finalRetainedIslr.toFixed(2));
+  }
+
+  const residualWithIslr = Number(
+    (finalTotal - finalRetained - finalRetainedIslr).toFixed(2),
+  );
+
   const { data: invoice, error } = await supabase
     .from("invoices")
     .insert({
@@ -187,8 +243,9 @@ export async function createInvoice(
       doc_type: doc,
       state: "confirmed",
       invoice_date: invoiceDate,
+      registration_date: registrationDate,
       due_date: invoiceDate,
-      invoice_number: invoiceNumber,
+      invoice_number: normalizedNumber,
       control_number: controlNumber || null,
       affected_document: affectedDocument || null,
       import_file_number: importFileNumber || null,
@@ -202,14 +259,15 @@ export async function createInvoice(
       amount_exempt: finalExempt,
       amount_total: finalTotal,
       amount_retained_iva: finalRetained,
+      amount_retained_islr: finalRetainedIslr,
       amount_untaxed_usd: usdUntaxed,
       amount_tax_usd: usdTax,
       amount_exempt_usd: usdExempt,
       amount_total_usd: usdTotal,
-      amount_residual: residual,
-      amount_residual_usd: usdResidual,
+      amount_residual: residualWithIslr,
+      amount_residual_usd: toUsd(residualWithIslr, rateForUsd),
       amount_paid: 0,
-      payment_state: residual <= 0 ? "paid" : "not_paid",
+      payment_state: residualWithIslr <= 0 ? "paid" : "not_paid",
       created_by: user?.id,
     })
     .select("id")
@@ -218,10 +276,10 @@ export async function createInvoice(
   if (error) {
     if (/duplicate|unique|23505/i.test(error.message)) {
       return {
-        error: `Ya existe la factura ${invoiceNumber} para este tercero. No se puede registrar duplicada.`,
+        error: `Ya existe la factura ${normalizedNumber} para este tercero. No se puede registrar duplicada.`,
       };
     }
-    // Soft fallback if migration 00008 not applied yet
+    // Soft fallback if migration not applied yet
     if (/column|does not exist|schema cache/i.test(error.message)) {
       const { data: legacy, error: legacyErr } = await supabase
         .from("invoices")
@@ -234,7 +292,7 @@ export async function createInvoice(
           state: "confirmed",
           invoice_date: invoiceDate,
           due_date: invoiceDate,
-          invoice_number: invoiceNumber,
+          invoice_number: normalizedNumber,
           control_number: controlNumber || null,
           affected_document: affectedDocument || null,
           import_file_number: importFileNumber || null,
@@ -254,7 +312,7 @@ export async function createInvoice(
       if (legacyErr) {
         if (/duplicate|unique|23505/i.test(legacyErr.message)) {
           return {
-            error: `Ya existe la factura ${invoiceNumber} para este tercero. No se puede registrar duplicada.`,
+            error: `Ya existe la factura ${normalizedNumber} para este tercero. No se puede registrar duplicada.`,
           };
         }
         return { error: legacyErr.message };
@@ -263,8 +321,7 @@ export async function createInvoice(
       await tryPostAccounting(legacy.id);
       revalidateAll();
       return {
-        success:
-          "Factura registrada (aplica migración dual_currency_fiscal en Supabase para campos nuevos).",
+        success: `Factura registrada · ${legacy.id}`,
       };
     }
     return { error: error.message };
@@ -292,7 +349,7 @@ export async function createInvoice(
     /* ignore */
   }
   revalidateAll();
-  return { success: "Factura registrada." };
+  return { success: `Factura registrada · ${invoice.id}` };
 }
 
 async function insertLines(

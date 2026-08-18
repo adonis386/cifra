@@ -42,6 +42,10 @@ export function BookForm() {
         <Button type="submit" disabled={pending}>
           {pending ? "Generando…" : "Generar libro desde facturas"}
         </Button>
+        <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
+          El rango filtra por <strong>fecha de registro</strong> de la factura
+          (no la fecha del documento), para quincenas de contribuyentes especiales.
+        </p>
       </div>
     </form>
   );

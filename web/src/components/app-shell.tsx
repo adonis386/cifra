@@ -21,6 +21,7 @@ import {
   Library,
   ClipboardList,
   ShieldCheck,
+  Package,
 } from "lucide-react";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { signOut } from "@/lib/actions/auth";
@@ -34,6 +35,7 @@ const groups = [
     items: [
       { href: "/app", label: "Inicio", icon: LayoutDashboard },
       { href: "/app/partners", label: "Terceros", icon: Users },
+      { href: "/app/products", label: "Productos", icon: Package },
       { href: "/app/invoices", label: "Facturas", icon: FileText },
       { href: "/app/receivables", label: "Por cobrar", icon: CircleDollarSign },
       { href: "/app/payables", label: "Por pagar", icon: HandCoins },

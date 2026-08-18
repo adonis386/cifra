@@ -27,6 +27,13 @@ function num(n: number) {
   return Math.abs(Number(n || 0)).toFixed(2);
 }
 
+/** Solo dígitos, máx. 14 (SENIAT vou_number). */
+export function formatVoucherNumber(raw: string, maxSize = 14) {
+  const only = String(raw || "").replace(/\D/g, "");
+  if (!only) return "0";
+  return only.slice(0, maxSize);
+}
+
 export function buildIvaTxt99035(lines: IvaTxtLine[]) {
   return lines
     .map((l) =>
@@ -43,7 +50,7 @@ export function buildIvaTxt99035(lines: IvaTxtLine[]) {
         num(l.amountUntaxed),
         num(l.amountWithheld),
         String(l.affectedDocument || "0").replace(/-/g, "") || "0",
-        String(l.voucherNumber || "").replace(/-/g, "").slice(0, 14),
+        formatVoucherNumber(l.voucherNumber, 14),
         num(l.amountExempt || 0),
         num(l.alicuota ?? 16),
         String(l.expediente || "0"),

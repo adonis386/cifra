@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getActiveCompany, periodFromDate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { buildIslrXml } from "@/lib/seniat/xml-islr";
+import { nextCompanySequence } from "@/lib/actions/sequences";
 
 export type ActionState = { error?: string; success?: string; xml?: string };
 
@@ -50,7 +51,9 @@ export async function createIslrWithholding(
   const taxable = Math.max(baseAmount * basePct - subtract, 0);
   const withheld = Number(((taxable * Number(rate.rate)) / 100).toFixed(2));
   const period = periodFromDate(voucherDate);
-  const voucherNumber = `ISLR${period}${String(Date.now()).slice(-5)}`;
+  const seq = await nextCompanySequence("wh_islr", { period, padding: 8 });
+  if (!seq.ok) return { error: seq.error };
+  const voucherNumber = seq.value.replace(/\D/g, "").slice(0, 14);
 
   const { data: wh, error } = await supabase
     .from("withholding_islr")
@@ -81,14 +84,16 @@ export async function createIslrWithholding(
   });
   if (lineErr) return { error: lineErr.message };
 
+  const prevIslr = Number(invoice.amount_retained_islr || 0);
   await supabase
     .from("invoices")
-    .update({ amount_retained_islr: withheld })
+    .update({ amount_retained_islr: Number((prevIslr + withheld).toFixed(2)) })
     .eq("id", invoice.id);
 
   revalidatePath("/app/withholdings");
   revalidatePath("/app/invoices");
-  return { success: `Comprobante ISLR ${voucherNumber} · retenido ${withheld.toFixed(2)}` };
+  revalidatePath("/app/config");
+  return { success: `Comprobante ISLR ${voucherNumber} · retenido ${withheld.toFixed(2)} · ${Date.now()}` };
 }
 
 export async function exportIslrXml(

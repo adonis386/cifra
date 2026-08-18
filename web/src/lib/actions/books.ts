@@ -9,6 +9,7 @@ export type ActionState = { error?: string; success?: string };
 type BookInvoice = {
   id: string;
   invoice_date: string;
+  registration_date?: string;
   invoice_number: string;
   control_number: string | null;
   doc_type: string;
@@ -51,10 +52,28 @@ export async function generateFiscalBook(
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Filtro por fecha de registro (contable); fallback a invoice_date si no migró
   let invoices: BookInvoice[] | null = null;
   let invErr: { message: string } | null = null;
 
   {
+    const res = await supabase
+      .from("invoices")
+      .select(
+        "id, invoice_date, registration_date, invoice_number, control_number, doc_type, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva, sin_cred, partners(name, rif)",
+      )
+      .eq("company_id", company.id)
+      .in("move_type", moveTypes)
+      .gte("registration_date", periodStart)
+      .lte("registration_date", periodEnd)
+      .neq("state", "cancelled")
+      .eq("sin_cred", false)
+      .order("registration_date", { ascending: true });
+    invoices = res.data as BookInvoice[] | null;
+    invErr = res.error;
+  }
+
+  if (invErr && /registration_date|column/i.test(invErr.message)) {
     const res = await supabase
       .from("invoices")
       .select(
@@ -113,12 +132,16 @@ export async function generateFiscalBook(
   const lines = invoices.map((inv, idx) => {
     const partner = inv.partners;
     const p = Array.isArray(partner) ? partner[0] : partner;
+    const regDate =
+      (inv as { registration_date?: string }).registration_date ||
+      inv.invoice_date;
     return {
       book_id: book.id,
       company_id: company.id,
       invoice_id: inv.id,
       rank: idx + 1,
       emission_date: inv.invoice_date,
+      registration_date: regDate,
       partner_rif: p?.rif || "",
       partner_name: p?.name || "",
       invoice_number: inv.invoice_number,
@@ -136,11 +159,21 @@ export async function generateFiscalBook(
     const { error: lineErr } = await supabase
       .from("fiscal_book_lines")
       .insert(lines);
-    if (lineErr) return { error: lineErr.message };
+    if (lineErr && /registration_date|column/i.test(lineErr.message)) {
+      const legacyLines = lines.map(({ registration_date: _r, ...rest }) => rest);
+      const { error: retryErr } = await supabase
+        .from("fiscal_book_lines")
+        .insert(legacyLines);
+      if (retryErr) return { error: retryErr.message };
+    } else if (lineErr) {
+      return { error: lineErr.message };
+    }
   }
 
   revalidatePath("/app/books");
-  return { success: `Libro generado con ${lines.length} líneas.` };
+  return {
+    success: `Libro generado con ${lines.length} líneas (filtro por fecha de registro). · ${Date.now()}`,
+  };
 }
 
 /** Elimina un libro del histórico (líneas en cascade). */

@@ -41,8 +41,13 @@ export default async function InvoicesPage() {
 
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
-  const [{ data: partners }, { data: invoices }, { data: concepts }, rate] =
-    await Promise.all([
+  const [
+    { data: partners },
+    { data: invoices },
+    { data: concepts },
+    productsRes,
+    rate,
+  ] = await Promise.all([
       supabase.from("partners").select("id, name, rif").eq("company_id", company.id).order("name"),
       supabase
         .from("invoices")
@@ -58,8 +63,16 @@ export default async function InvoicesPage() {
         .or(`company_id.eq.${company.id},company_id.is.null`)
         .eq("active", true)
         .order("code"),
+      supabase
+        .from("products")
+        .select("id, code, name, price_unit, tax_code")
+        .eq("company_id", company.id)
+        .eq("active", true)
+        .order("name"),
       getExchangeRate(company.id, today),
     ]);
+
+  const products = productsRes.error ? [] : productsRes.data;
 
   const companyScoped = (concepts || []).filter((c) => c.company_id === company.id);
   const pool = companyScoped.length ? companyScoped : concepts || [];
@@ -69,6 +82,14 @@ export default async function InvoicesPage() {
     seen.add(c.code);
     return true;
   });
+
+  const productList = (products || []).map((p) => ({
+    id: p.id,
+    code: p.code || "",
+    name: p.name,
+    price_unit: Number(p.price_unit || 0),
+    tax_code: p.tax_code || "IVA16",
+  }));
 
   return (
     <div className="space-y-8">
@@ -88,6 +109,7 @@ export default async function InvoicesPage() {
         <InvoiceForm
           partners={partners || []}
           islrConcepts={islrConcepts}
+          products={productList}
           initialRate={rate || 0}
         />
       </SectionCard>

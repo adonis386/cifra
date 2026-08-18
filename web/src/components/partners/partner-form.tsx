@@ -24,14 +24,18 @@ const initial: ActionState = {};
 export function PartnerForm() {
   const [state, action, pending] = useActionState(createPartner, initial);
   const [form, setForm] = useState<PartnerValues>(empty);
+  const [resetToken, setResetToken] = useState(state.success);
 
   useEffect(() => {
     if (state.values) setForm(state.values);
   }, [state.values]);
 
   useEffect(() => {
-    if (state.success) setForm(empty);
-  }, [state.success]);
+    if (state.success && state.success !== resetToken) {
+      setResetToken(state.success);
+      setForm(empty);
+    }
+  }, [state.success, resetToken]);
 
   const rifPlaceholder =
     form.person_type === "natural" ? "V-12345678-9" : "J-12345678-9";
@@ -125,11 +129,14 @@ export function PartnerForm() {
       <div className="md:col-span-2">
         <FieldError message={state.error} />
         {state.success && (
-          <p className="mb-2 text-sm text-[var(--color-accent)]">{state.success}</p>
+          <p className="mb-2 text-sm text-[var(--color-accent)]">Tercero guardado.</p>
         )}
         <Button type="submit" disabled={pending}>
           {pending ? "Guardando…" : "Guardar tercero"}
         </Button>
+        <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+          No se permiten RIF/cédula duplicados en la misma empresa.
+        </p>
       </div>
     </form>
   );

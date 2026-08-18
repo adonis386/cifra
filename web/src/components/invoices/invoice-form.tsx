@@ -11,6 +11,13 @@ const initial: ActionState = {};
 
 type Partner = { id: string; name: string; rif: string };
 type IslrConcept = { id: string; code: string; name: string; withholdable?: boolean };
+type Product = {
+  id: string;
+  code: string;
+  name: string;
+  price_unit: number;
+  tax_code: string;
+};
 
 type TaxOption = {
   code: string;
@@ -28,6 +35,7 @@ const TAX_OPTIONS: TaxOption[] = [
 
 type Line = {
   id: string;
+  productId: string;
   description: string;
   quantity: string;
   priceUnit: string;
@@ -38,6 +46,7 @@ type Line = {
 function emptyLine(id = "1"): Line {
   return {
     id,
+    productId: "",
     description: "",
     quantity: "1",
     priceUnit: "0",
@@ -94,10 +103,12 @@ function dual(bs: number, rate: number) {
 export function InvoiceForm({
   partners,
   islrConcepts = [],
+  products = [],
   initialRate = 0,
 }: {
   partners: Partner[];
   islrConcepts?: IslrConcept[];
+  products?: Product[];
   initialRate?: number;
 }) {
   const [state, action, pending] = useActionState(createInvoice, initial);
@@ -106,6 +117,7 @@ export function InvoiceForm({
   const [moveType, setMoveType] = useState("in_invoice");
   const [partnerId, setPartnerId] = useState(partners[0]?.id || "");
   const [invoiceDate, setInvoiceDate] = useState(today);
+  const [registrationDate, setRegistrationDate] = useState(today);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [controlNumber, setControlNumber] = useState("");
   const [affectedDocument, setAffectedDocument] = useState("");
@@ -139,6 +151,7 @@ export function InvoiceForm({
     setLines([emptyLine()]);
     setRetencionTouched(false);
     setWithholdingPct(moveType.startsWith("in_") ? "75" : "0");
+    setRegistrationDate(invoiceDate || today);
   }
 
   const computedLines = useMemo(
@@ -277,15 +290,34 @@ export function InvoiceForm({
           </Select>
         </div>
         <div>
-          <Label htmlFor="invoice_date">Fecha</Label>
+          <Label htmlFor="invoice_date">Fecha factura</Label>
           <Input
             id="invoice_date"
             name="invoice_date"
             type="date"
             required
             value={invoiceDate}
-            onChange={(e) => setInvoiceDate(e.target.value)}
+            onChange={(e) => {
+              setInvoiceDate(e.target.value);
+              if (!registrationDate || registrationDate === invoiceDate) {
+                setRegistrationDate(e.target.value);
+              }
+            }}
           />
+        </div>
+        <div>
+          <Label htmlFor="registration_date">Fecha registro (libro)</Label>
+          <Input
+            id="registration_date"
+            name="registration_date"
+            type="date"
+            required
+            value={registrationDate}
+            onChange={(e) => setRegistrationDate(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+            Para libros quincenales (puede diferir de la fecha del documento).
+          </p>
         </div>
         <div>
           <Label htmlFor="invoice_number">Nº factura</Label>
@@ -447,8 +479,45 @@ export function InvoiceForm({
               <p className="mb-2 text-xs font-medium text-[var(--color-muted-foreground)] lg:hidden">
                 Línea {idx + 1}
               </p>
-              <div className="grid gap-2 lg:grid-cols-[minmax(0,1.6fr)_4.5rem_6rem_8rem_minmax(0,1.2fr)_5.5rem_5.5rem_2.25rem] lg:items-start">
-                <div>
+              <div className="grid gap-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)_4.5rem_6rem_8rem_minmax(0,1.2fr)_5.5rem_5.5rem_2.25rem] lg:items-start">
+                {products.length > 0 ? (
+                  <div>
+                    <label
+                      htmlFor={`prod-${line.id}`}
+                      className="mb-1.5 block text-sm font-medium lg:hidden"
+                    >
+                      Producto
+                    </label>
+                    <Select
+                      id={`prod-${line.id}`}
+                      value={line.productId}
+                      onChange={(e) => {
+                        const pid = e.target.value;
+                        const prod = products.find((p) => p.id === pid);
+                        if (prod) {
+                          updateLine(line.id, {
+                            productId: pid,
+                            description: prod.name,
+                            priceUnit: String(prod.price_unit),
+                            taxCode: prod.tax_code || "IVA16",
+                          });
+                        } else {
+                          updateLine(line.id, { productId: "" });
+                        }
+                      }}
+                      aria-label="Producto"
+                    >
+                      <option value="">Libre…</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.code ? `${p.code} — ` : ""}
+                          {p.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                ) : null}
+                <div className={products.length ? "" : "lg:col-span-2"}>
                   <label
                     htmlFor={`desc-${line.id}`}
                     className="mb-1.5 block text-sm font-medium lg:hidden"
@@ -615,12 +684,15 @@ export function InvoiceForm({
       </div>
 
       <FieldError message={state.error} />
-      {state.success && <p className="text-sm text-[var(--color-accent)]">{state.success}</p>}
+      {state.success && (
+        <p className="text-sm text-[var(--color-accent)]">Factura registrada.</p>
+      )}
       <Button type="submit" disabled={pending || totals.total <= 0}>
         {pending ? "Guardando…" : "Registrar factura"}
       </Button>
       <p className="text-xs text-[var(--color-muted-foreground)]">
-        No se permiten números de factura repetidos para el mismo tercero.
+        No se permiten números de factura repetidos para el mismo tercero. Elige
+        concepto ISLR en la línea para calcular retención.
       </p>
     </form>
   );

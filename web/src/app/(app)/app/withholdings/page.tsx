@@ -73,9 +73,12 @@ export default async function WithholdingsPage() {
       | { name: string; rif: string }[]
       | null;
     const p = Array.isArray(partner) ? partner[0] : partner;
+    const retIslr = Number(
+      (inv as { amount_retained_islr?: number }).amount_retained_islr || 0,
+    );
     return {
       id: inv.id,
-      label: `${inv.invoice_date} · ${inv.invoice_number} · ${p?.name || ""} · Base ${formatMoney(inv.amount_untaxed)} · RetIVA ${formatMoney(inv.amount_retained_iva)}`,
+      label: `${inv.invoice_date} · ${inv.invoice_number} · ${p?.name || ""} · Base ${formatMoney(inv.amount_untaxed)} · RetIVA ${formatMoney(inv.amount_retained_iva)}${retIslr > 0 ? ` · RetISLR ${formatMoney(retIslr)}` : ""}`,
     };
   });
 

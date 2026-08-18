@@ -46,6 +46,21 @@ export async function createPartner(
   if (!checked.ok) return { error: checked.error, values };
 
   const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("partners")
+    .select("id, name")
+    .eq("company_id", company.id)
+    .eq("rif", checked.rif)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    return {
+      error: `Ya está registrado el RIF/cédula ${checked.rif} (${existing[0].name}). No se puede duplicar.`,
+      values,
+    };
+  }
+
   const { error } = await supabase.from("partners").insert({
     company_id: company.id,
     name,
@@ -58,15 +73,18 @@ export async function createPartner(
   });
 
   if (error) {
-    if (error.code === "23505") {
-      return { error: "Ya existe un tercero con ese RIF.", values };
+    if (error.code === "23505" || /duplicate|unique/i.test(error.message)) {
+      return {
+        error: `Ya existe un tercero con el RIF/cédula ${checked.rif}.`,
+        values,
+      };
     }
     return { error: error.message, values };
   }
 
   revalidatePath("/app/partners");
   revalidatePath("/app/invoices");
-  return { success: "Tercero guardado." };
+  return { success: `Tercero guardado · ${Date.now()}` };
 }
 
 export async function deletePartner(formData: FormData): Promise<void> {

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getActiveCompany, periodFromDate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { buildIvaTxt99035 } from "@/lib/seniat/txt-iva";
+import { nextCompanySequence } from "@/lib/actions/sequences";
 
 export type ActionState = { error?: string; success?: string; txt?: string };
 
@@ -40,7 +41,10 @@ export async function createIvaWithholding(
   }
 
   const period = periodFromDate(voucherDate);
-  const voucherNumber = `${period}${String(Date.now()).slice(-6)}`;
+  const seq = await nextCompanySequence("wh_iva", { period, padding: 8 });
+  if (!seq.ok) return { error: seq.error };
+  // SENIAT: hasta 14 dígitos (AAAAMM + correlativo 8)
+  const voucherNumber = seq.value.replace(/\D/g, "").slice(0, 14);
 
   const { data: wh, error } = await supabase
     .from("withholding_iva")
@@ -82,6 +86,7 @@ export async function createIvaWithholding(
   if (lineErr) return { error: lineErr.message };
 
   revalidatePath("/app/withholdings");
+  revalidatePath("/app/config");
   return { success: `Comprobante ${voucherNumber} creado.` };
 }
 

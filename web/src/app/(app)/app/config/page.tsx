@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { BrandingForm } from "@/components/config/branding-form";
 import { ConfigForms } from "@/components/config/config-forms";
+import { SequenceConfigForm } from "@/components/config/sequence-config-form";
 import { getCompanyPrintProfile } from "@/lib/company-print";
 import { formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
+import { listCompanySequences } from "@/lib/actions/sequences";
 import { createClient } from "@/lib/supabase/server";
 import {
   DataTable,
@@ -31,7 +33,7 @@ export default async function ConfigPage() {
 
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
-  const [branding, { data: units }, { data: concepts }, { data: rates }, rateToday] =
+  const [branding, { data: units }, { data: concepts }, { data: rates }, rateToday, sequences] =
     await Promise.all([
       getCompanyPrintProfile(company.id),
       supabase
@@ -52,6 +54,7 @@ export default async function ConfigPage() {
         .order("rate_date", { ascending: false })
         .limit(12),
       getExchangeRate(company.id, today),
+      listCompanySequences(),
     ]);
 
   const latest =
@@ -70,7 +73,7 @@ export default async function ConfigPage() {
       <PageHeader
         eyebrow="Sistema"
         title="Configuración"
-        description="Membrete PDF, datos de empresa, tasa USD/Bs, UT y catálogo ISLR."
+        description="Membrete PDF, correlativos de comprobantes, tasa USD/Bs, UT y catálogo ISLR."
       />
 
       <SectionCard
@@ -82,6 +85,13 @@ export default async function ConfigPage() {
         ) : (
           <EmptyState title="Sin datos de empresa" />
         )}
+      </SectionCard>
+
+      <SectionCard
+        title="Correlativos de comprobantes"
+        description="Aquí se configura la numeración de retenciones IVA/ISLR y el N° de control."
+      >
+        <SequenceConfigForm sequences={sequences} />
       </SectionCard>
 
       <SectionCard
