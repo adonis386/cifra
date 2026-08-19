@@ -13,6 +13,7 @@ type Rate = {
   concept_id: string;
   person_type: string;
   rate: number;
+  subtract_ut?: number;
   code: string | null;
 };
 
@@ -155,7 +156,11 @@ export function WithholdingHub({
               <Select id="rate_id" name="rate_id" required disabled={!filteredRates.length}>
                 {filteredRates.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.person_type} · {r.rate}% {r.code ? `· ${r.code}` : ""}
+                    {r.person_type} · {r.rate}%
+                    {Number(r.subtract_ut || 0) > 0
+                      ? ` + sustr. ${r.subtract_ut} UT`
+                      : ""}
+                    {r.code ? ` · ${r.code}` : ""}
                   </option>
                 ))}
               </Select>

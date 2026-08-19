@@ -11,6 +11,7 @@ import {
   Td,
   Th,
 } from "@/components/layout";
+import { cancelIvaWithholding } from "@/lib/actions/withholdings";
 
 export default async function WithholdingsPage() {
   const company = await getActiveCompany();
@@ -42,6 +43,7 @@ export default async function WithholdingsPage() {
       .from("withholding_iva")
       .select("id, voucher_number, period, voucher_date, amount_withheld, state, partners(name, rif)")
       .eq("company_id", company.id)
+      .neq("state", "cancelled")
       .order("voucher_date", { ascending: false }),
     supabase
       .from("withholding_islr")
@@ -55,7 +57,7 @@ export default async function WithholdingsPage() {
       .order("code"),
     supabase
       .from("islr_rates")
-      .select("id, concept_id, person_type, rate")
+      .select("id, concept_id, person_type, rate, subtract_ut, code")
       .eq("active", true),
   ]);
 
@@ -65,7 +67,16 @@ export default async function WithholdingsPage() {
     .filter((c) => c.code !== "000")
     .map(({ id, code, name }) => ({ id, code, name }));
   const conceptIds = new Set(companyConcepts.map((c) => c.id));
-  const filteredRates = (rates || []).map((r) => ({ ...r, code: null as string | null })).filter((r) => conceptIds.has(r.concept_id));
+  const filteredRates = (rates || [])
+    .filter((r) => conceptIds.has(r.concept_id))
+    .map((r) => ({
+      id: r.id,
+      concept_id: r.concept_id,
+      person_type: r.person_type,
+      rate: Number(r.rate || 0),
+      subtract_ut: Number(r.subtract_ut || 0),
+      code: r.code || null,
+    }));
 
   const invoiceOptions = (invoices || []).map((inv) => {
     const partner = inv.partners as unknown as
@@ -130,13 +141,24 @@ export default async function WithholdingsPage() {
                         {formatMoney(w.amount_withheld)}
                       </Td>
                       <Td>
-                        <Link
-                          href={`/print/iva/${w.id}`}
-                          className="text-xs font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
-                          target="_blank"
-                        >
-                          PDF
-                        </Link>
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/print/iva/${w.id}`}
+                            className="text-xs font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+                            target="_blank"
+                          >
+                            PDF
+                          </Link>
+                          <form action={cancelIvaWithholding}>
+                            <input type="hidden" name="id" value={w.id} />
+                            <button
+                              type="submit"
+                              className="text-xs font-semibold text-[var(--color-destructive)] underline-offset-4 hover:underline"
+                            >
+                              Anular
+                            </button>
+                          </form>
+                        </div>
                       </Td>
                     </tr>
                   );

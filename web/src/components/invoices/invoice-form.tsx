@@ -9,8 +9,15 @@ import { Select } from "@/components/layout";
 
 const initial: ActionState = {};
 
-type Partner = { id: string; name: string; rif: string };
+type Partner = { id: string; name: string; rif: string; person_type?: string };
 type IslrConcept = { id: string; code: string; name: string; withholdable?: boolean };
+type IslrRate = {
+  concept_id: string;
+  person_type: string;
+  rate: number;
+  subtract_ut: number;
+  base_percent?: number;
+};
 type Product = {
   id: string;
   code: string;
@@ -103,13 +110,17 @@ function dual(bs: number, rate: number) {
 export function InvoiceForm({
   partners,
   islrConcepts = [],
+  islrRates = [],
   products = [],
   initialRate = 0,
+  taxUnitAmount = 0,
 }: {
   partners: Partner[];
   islrConcepts?: IslrConcept[];
+  islrRates?: IslrRate[];
   products?: Product[];
   initialRate?: number;
+  taxUnitAmount?: number;
 }) {
   const [state, action, pending] = useActionState(createInvoice, initial);
   const [ctrlPending, startCtrl] = useTransition();
@@ -134,9 +145,21 @@ export function InvoiceForm({
   const [resetToken, setResetToken] = useState(state.success);
   const [retencionTouched, setRetencionTouched] = useState(false);
 
-  const resolvedPartnerId =
-    partners.find((p) => p.id === partnerId)?.id || partners[0]?.id || "";
+  const resolvedPartner =
+    partners.find((p) => p.id === partnerId) || partners[0];
+  const resolvedPartnerId = resolvedPartner?.id || "";
+  const partnerPersonType =
+    resolvedPartner?.person_type === "natural" ? "natural" : "juridica";
   const rateNum = Number(exchangeRate || 0);
+
+  function rateForConcept(conceptId: string) {
+    if (!conceptId) return null;
+    return (
+      islrRates.find(
+        (r) => r.concept_id === conceptId && r.person_type === partnerPersonType,
+      ) || islrRates.find((r) => r.concept_id === conceptId) || null
+    );
+  }
   const showImport = moveType.startsWith("in_");
 
   if (state.success && state.success !== resetToken) {
@@ -163,10 +186,32 @@ export function InvoiceForm({
     let untaxed = 0;
     let tax = 0;
     let exempt = 0;
+    let retainedIslr = 0;
+    const islrParts: string[] = [];
     for (const l of computedLines) {
       untaxed += l.untaxed;
       tax += l.tax;
       exempt += l.exempt;
+      if (!l.line.conceptId) continue;
+      const rate =
+        islrRates.find(
+          (r) =>
+            r.concept_id === l.line.conceptId &&
+            r.person_type === partnerPersonType,
+        ) || islrRates.find((r) => r.concept_id === l.line.conceptId);
+      if (!rate) continue;
+      const base = Number(l.untaxed || l.exempt || 0);
+      const basePct = Number(rate.base_percent || 100) / 100;
+      const subtractBs = Number(rate.subtract_ut || 0) * taxUnitAmount;
+      const taxable = Math.max(base * basePct - subtractBs, 0);
+      const amount = Number(((taxable * Number(rate.rate || 0)) / 100).toFixed(2));
+      retainedIslr += amount;
+      const label = `${Number(rate.rate)}%${
+        rate.subtract_ut > 0
+          ? ` + sustr. ${Number(rate.subtract_ut)} UT`
+          : ""
+      }`;
+      if (!islrParts.includes(label)) islrParts.push(label);
     }
     const effectivePct = tax <= 0 ? 0 : Number(withholdingPct || 0);
     const retained = (tax * effectivePct) / 100;
@@ -176,9 +221,17 @@ export function InvoiceForm({
       exempt: Number(exempt.toFixed(2)),
       total: Number((untaxed + tax + exempt).toFixed(2)),
       retained: Number(retained.toFixed(2)),
+      retainedIslr: Number(retainedIslr.toFixed(2)),
+      islrLabel: islrParts.join(" · ") || "Sin concepto ISLR",
       hasIva: tax > 0,
     };
-  }, [computedLines, withholdingPct]);
+  }, [
+    computedLines,
+    withholdingPct,
+    islrRates,
+    partnerPersonType,
+    taxUnitAmount,
+  ]);
 
   useEffect(() => {
     if (!totals.hasIva) {
@@ -603,11 +656,18 @@ export function InvoiceForm({
                     aria-label="Concepto ISLR"
                   >
                     <option value="">Sin retención ISLR</option>
-                    {islrConcepts.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.code} — {c.name}
-                      </option>
-                    ))}
+                    {islrConcepts.map((c) => {
+                      const r = rateForConcept(c.id);
+                      const extra = r
+                        ? ` (${r.rate}%${r.subtract_ut > 0 ? ` + sustr. ${r.subtract_ut} UT` : ""})`
+                        : "";
+                      return (
+                        <option key={c.id} value={c.id}>
+                          {c.code} — {c.name}
+                          {extra}
+                        </option>
+                      );
+                    })}
                   </Select>
                 </div>
                 <div className="flex flex-col justify-center rounded-[var(--radius-md)] bg-[var(--color-muted)] px-3 py-2.5 lg:min-h-[46px]">
@@ -643,7 +703,7 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-[var(--radius-md)] bg-[var(--color-muted)] p-4 md:grid-cols-5">
+      <div className="grid gap-3 rounded-[var(--radius-md)] bg-[var(--color-muted)] p-4 md:grid-cols-6">
         <div>
           <p className="text-xs text-[var(--color-muted-foreground)]">Base gravable</p>
           <p className="font-mono text-sm font-semibold">{dual(totals.untaxed, rateNum)}</p>
@@ -681,6 +741,14 @@ export function InvoiceForm({
               : "Sin IVA (exento): retención 0%"}
           </p>
         </div>
+        <div>
+          <p className="text-xs text-[var(--color-muted-foreground)]">% ret. ISLR</p>
+          <p className="font-mono text-sm font-semibold">{totals.islrLabel}</p>
+          <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+            Retiene {dual(totals.retainedIslr, rateNum)}
+            {taxUnitAmount > 0 ? ` · UT ${money(taxUnitAmount)}` : ""}
+          </p>
+        </div>
       </div>
 
       <FieldError message={state.error} />
@@ -691,8 +759,10 @@ export function InvoiceForm({
         {pending ? "Guardando…" : "Registrar factura"}
       </Button>
       <p className="text-xs text-[var(--color-muted-foreground)]">
-        No se permiten números de factura repetidos para el mismo tercero. Elige
-        concepto ISLR en la línea para calcular retención.
+        No se permiten números de factura repetidos para el mismo tercero. En
+        ISLR elige el concepto: honorarios profesionales/médicos usan 3% más
+        sustraendo (cuando aplique). La tabla completa se carga cuando la
+        envíen.
       </p>
     </form>
   );

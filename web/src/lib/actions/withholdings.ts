@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getActiveCompany, periodFromDate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
-import { buildIvaTxt99035 } from "@/lib/seniat/txt-iva";
+import { buildIvaTxt99035, formatVoucherNumber } from "@/lib/seniat/txt-iva";
 import { nextCompanySequence } from "@/lib/actions/sequences";
 
 export type ActionState = { error?: string; success?: string; txt?: string };
@@ -40,11 +40,30 @@ export async function createIvaWithholding(
     };
   }
 
+  const { data: existingWh } = await supabase
+    .from("withholding_iva_lines")
+    .select("id, invoice_number, withholding_iva(id, state)")
+    .eq("company_id", company.id)
+    .eq("invoice_id", invoiceId);
+
+  const already = (existingWh || []).find((row) => {
+    const parent = row.withholding_iva as unknown as
+      | { state?: string }
+      | { state?: string }[]
+      | null;
+    const st = Array.isArray(parent) ? parent[0]?.state : parent?.state;
+    return st !== "cancelled";
+  });
+  if (already) {
+    return {
+      error: `Ya existe un comprobante IVA para la factura ${invoice.invoice_number}. SENIAT no admite el mismo número dos veces en el TXT.`,
+    };
+  }
+
   const period = periodFromDate(voucherDate);
   const seq = await nextCompanySequence("wh_iva", { period, padding: 8 });
   if (!seq.ok) return { error: seq.error };
-  // SENIAT: hasta 14 dígitos (AAAAMM + correlativo 8)
-  const voucherNumber = seq.value.replace(/\D/g, "").slice(0, 14);
+  const voucherNumber = formatVoucherNumber(seq.value, 14, period);
 
   const { data: wh, error } = await supabase
     .from("withholding_iva")
@@ -88,6 +107,23 @@ export async function createIvaWithholding(
   revalidatePath("/app/withholdings");
   revalidatePath("/app/config");
   return { success: `Comprobante ${voucherNumber} creado.` };
+}
+
+export async function cancelIvaWithholding(
+  formData: FormData,
+): Promise<void> {
+  const company = await getActiveCompany();
+  const id = String(formData.get("id") || "");
+  if (!company || !id) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("withholding_iva")
+    .update({ state: "cancelled" })
+    .eq("id", id)
+    .eq("company_id", company.id);
+
+  revalidatePath("/app/withholdings");
 }
 
 export async function exportIvaTxt(

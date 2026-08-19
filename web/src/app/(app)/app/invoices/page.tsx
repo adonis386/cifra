@@ -45,10 +45,16 @@ export default async function InvoicesPage() {
     { data: partners },
     { data: invoices },
     { data: concepts },
+    { data: islrRates },
+    { data: taxUnit },
     productsRes,
     rate,
   ] = await Promise.all([
-      supabase.from("partners").select("id, name, rif").eq("company_id", company.id).order("name"),
+      supabase
+        .from("partners")
+        .select("id, name, rif, person_type")
+        .eq("company_id", company.id)
+        .order("name"),
       supabase
         .from("invoices")
         .select(
@@ -63,6 +69,17 @@ export default async function InvoicesPage() {
         .or(`company_id.eq.${company.id},company_id.is.null`)
         .eq("active", true)
         .order("code"),
+      supabase
+        .from("islr_rates")
+        .select("concept_id, person_type, rate, subtract_ut, base_percent")
+        .eq("active", true),
+      supabase
+        .from("tax_units")
+        .select("amount")
+        .or(`company_id.eq.${company.id},company_id.is.null`)
+        .order("date_from", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
       supabase
         .from("products")
         .select("id, code, name, price_unit, tax_code")
@@ -109,8 +126,16 @@ export default async function InvoicesPage() {
         <InvoiceForm
           partners={partners || []}
           islrConcepts={islrConcepts}
+          islrRates={(islrRates || []).map((r) => ({
+            concept_id: r.concept_id,
+            person_type: r.person_type,
+            rate: Number(r.rate || 0),
+            subtract_ut: Number(r.subtract_ut || 0),
+            base_percent: Number(r.base_percent || 100),
+          }))}
           products={productList}
           initialRate={rate || 0}
+          taxUnitAmount={Number(taxUnit?.amount || 0)}
         />
       </SectionCard>
 
@@ -125,6 +150,7 @@ export default async function InvoicesPage() {
                 <Th>Factura / Control</Th>
                 <Th className="text-right">Total</Th>
                 <Th className="text-right">Ret. IVA</Th>
+                <Th className="text-right">Ret. ISLR</Th>
                 <Th className="text-right"></Th>
               </tr>
             </thead>
@@ -163,6 +189,9 @@ export default async function InvoicesPage() {
                         : formatMoney(inv.amount_total)}
                     </Td>
                     <Td className="text-right font-mono">{formatMoney(inv.amount_retained_iva)}</Td>
+                    <Td className="text-right font-mono">
+                      {formatMoney(inv.amount_retained_islr)}
+                    </Td>
                     <Td className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Link

@@ -17,3 +17,5 @@ Thumbs.db
 web/.cursor/
 web/design-system/
 
+
+.tmp-audio/
