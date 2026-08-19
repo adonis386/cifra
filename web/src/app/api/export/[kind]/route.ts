@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { buildXlsxBuffer, xlsxResponse } from "@/lib/export/xlsx";
+import { buildXlsxBuffer, xlsxResponse, type SheetRow } from "@/lib/export/xlsx";
 import {
   loadFiscalBook,
   loadInvoicesList,
@@ -9,6 +9,18 @@ import {
   loadPayments,
   loadTrialBalance,
 } from "@/lib/export/reports-data";
+
+function cell(v: unknown): string | number | null {
+  if (v == null) return null;
+  if (typeof v === "number" || typeof v === "string") return v;
+  return String(v);
+}
+
+function sheetRow(obj: Record<string, unknown>): SheetRow {
+  const out: SheetRow = {};
+  for (const [k, v] of Object.entries(obj)) out[k] = cell(v);
+  return out;
+}
 
 export async function GET(
   request: NextRequest,
@@ -175,7 +187,7 @@ export async function GET(
           {
             name: sheetName,
             rows: isSale
-              ? rawRows.map((r) => ({
+              ? rawRows.map((r) => sheetRow({
                   "N° Operacion": r.nro_op,
                   "Fecha Emision": r.fecha_emision,
                   "Tipo Doc.": r.tipo_doc,
@@ -214,7 +226,7 @@ export async function GET(
                   "Retención IVA": r.retencion_iva,
                   "Comp. Retención IVA": r.comp_retencion_iva,
                 }))
-              : rawRows.map((r) => ({
+              : rawRows.map((r) => sheetRow({
                   "N° Operacion": r.nro_op,
                   "Fecha Emisión": r.fecha_emision,
                   "Tipo Doc.": r.tipo_doc,
