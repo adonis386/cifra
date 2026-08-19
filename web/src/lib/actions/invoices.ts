@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getActiveCompany, periodFromDate, toUsd } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+import { seniatIvaWithheld, snapAlicuota } from "@/lib/seniat/txt-iva";
 
 export type ActionState = { error?: string; success?: string };
 
@@ -424,7 +425,7 @@ export async function applyIvaRetentionPct(
   const { data: invoice } = await supabase
     .from("invoices")
     .select(
-      "id, state, amount_tax, amount_total, amount_retained_islr, amount_paid",
+      "id, state, amount_tax, amount_untaxed, amount_total, amount_retained_islr, amount_paid",
     )
     .eq("id", invoiceId)
     .eq("company_id", company.id)
@@ -436,14 +437,16 @@ export async function applyIvaRetentionPct(
   }
 
   const tax = Number(invoice.amount_tax || 0);
-  if (tax <= 0) {
+  const base = Number(invoice.amount_untaxed || 0);
+  if (tax <= 0 || base <= 0) {
     return {
       ok: false,
       error: "Esta factura no tiene IVA (exenta o SDCF). No aplica retención IVA.",
     };
   }
 
-  const retained = Number(((tax * pct) / 100).toFixed(2));
+  const ali = snapAlicuota((tax / base) * 100);
+  const retained = seniatIvaWithheld(base, ali, pct);
   const residual = Number(
     (
       Number(invoice.amount_total || 0) -

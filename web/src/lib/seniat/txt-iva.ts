@@ -1,4 +1,4 @@
-/** Genera TXT Forma 99035 (retenciones IVA) — layout SENIAT / l10n_ve_full */
+/** Genera TXT Forma 99035 (retenciones IVA) — layout SENIAT */
 
 export type IvaTxtLine = {
   agentRif: string;
@@ -17,14 +17,64 @@ export type IvaTxtLine = {
   amountExempt?: number;
   alicuota?: number;
   expediente?: string;
+  retentionPct?: number;
 };
 
-function digits(rif: string) {
-  return rif.replace(/[-\s]/g, "").toUpperCase();
+const ALIQUOTS = [8, 16, 31];
+
+/** RIF SENIAT: exactamente 10 caracteres, letra + 9 dígitos, sin guiones. */
+export function formatRif99035(rif: string) {
+  const clean = String(rif || "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase();
+  const m = clean.match(/^([VEJPGC])(\d{1,9})$/);
+  if (!m) return clean.slice(0, 10);
+  return `${m[1]}${m[2].padStart(9, "0")}`;
+}
+
+export function snapAlicuota(rate: number) {
+  const n = Number(rate || 0);
+  if (n <= 0) return 16;
+  return ALIQUOTS.reduce((best, x) =>
+    Math.abs(x - n) < Math.abs(best - n) ? x : best,
+  );
+}
+
+/** IVA = base × alícuota / 100, 2 decimales. */
+export function seniatIvaAmount(base: number, alicuota: number) {
+  return Number(
+    ((Math.abs(Number(base) || 0) * Math.abs(Number(alicuota) || 0)) / 100).toFixed(
+      2,
+    ),
+  );
+}
+
+/**
+ * SENIAT: IVA retenido = base × alícuota × % retención / 10000.
+ * En compras el % típico es 75.
+ */
+export function seniatIvaWithheld(
+  base: number,
+  alicuota: number,
+  retentionPct = 75,
+) {
+  return Number(
+    (
+      (Math.abs(Number(base) || 0) *
+        Math.abs(Number(alicuota) || 0) *
+        Math.abs(Number(retentionPct) || 0)) /
+      10000
+    ).toFixed(2),
+  );
 }
 
 function num(n: number) {
   return Math.abs(Number(n || 0)).toFixed(2);
+}
+
+function invoiceDate99035(raw: string) {
+  const s = String(raw || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : s;
 }
 
 /** SENIAT compara facturas ignorando ceros a la izquierda (0397 = 397). */
@@ -66,32 +116,39 @@ export function buildIvaTxt99035(lines: IvaTxtLine[]) {
   const seen = new Set<string>();
   const unique: IvaTxtLine[] = [];
   for (const l of lines) {
-    const key = `${digits(l.partnerRif)}|${invoiceNumberKey(l.invoiceNumber)}`;
+    const key = `${formatRif99035(l.partnerRif)}|${invoiceNumberKey(l.invoiceNumber)}`;
     if (seen.has(key)) continue;
     seen.add(key);
     unique.push(l);
   }
 
   return unique
-    .map((l) =>
-      [
-        digits(l.agentRif),
+    .map((l) => {
+      const ali = snapAlicuota(Number(l.alicuota || 16));
+      const pct = Number(l.retentionPct || 75);
+      const base = Number(l.amountUntaxed || 0);
+      const exempt = Number(l.amountExempt || 0);
+      const iva = seniatIvaAmount(base, ali);
+      const withheld = seniatIvaWithheld(base, ali, pct);
+      const total = Number((base + iva + exempt).toFixed(2));
+      return [
+        formatRif99035(l.agentRif),
         l.period,
-        l.invoiceDate,
-        l.operationType,
-        l.docType.padStart(2, "0"),
-        digits(l.partnerRif),
-        String(l.invoiceNumber || "").replace(/-/g, ""),
+        invoiceDate99035(l.invoiceDate),
+        l.operationType === "V" ? "V" : "C",
+        String(l.docType || "01").padStart(2, "0"),
+        formatRif99035(l.partnerRif),
+        String(l.invoiceNumber || "").replace(/-/g, "").slice(0, 20) || "0",
         String(l.controlNumber || "0").replace(/-/g, "").slice(0, 20) || "0",
-        num(l.amountTotal),
-        num(l.amountUntaxed),
-        num(l.amountWithheld),
-        String(l.affectedDocument || "0").replace(/-/g, "") || "0",
+        num(total),
+        num(base),
+        num(withheld),
+        String(l.affectedDocument || "0").replace(/-/g, "").slice(0, 20) || "0",
         formatVoucherNumber(l.voucherNumber, 14, l.period),
-        num(l.amountExempt || 0),
-        num(l.alicuota ?? 16),
-        String(l.expediente || "0"),
-      ].join("\t"),
-    )
+        num(exempt),
+        num(ali),
+        String(l.expediente || "0").slice(0, 15),
+      ].join("\t");
+    })
     .join("\n");
 }

@@ -3,9 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { getActiveCompany, periodFromDate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
-import { buildIvaTxt99035, formatVoucherNumber } from "@/lib/seniat/txt-iva";
 import { nextCompanySequence } from "@/lib/actions/sequences";
 import { applyIvaRetentionPct } from "@/lib/actions/invoices";
+import {
+  buildIvaTxt99035,
+  formatRif99035,
+  formatVoucherNumber,
+  seniatIvaWithheld,
+  snapAlicuota,
+} from "@/lib/seniat/txt-iva";
 
 export type ActionState = { error?: string; success?: string; txt?: string };
 
@@ -36,12 +42,30 @@ export async function createIvaWithholding(
 
   if (invErr || !invoice) return { error: "Factura no encontrada." };
 
-  let retainedIva = Number(invoice.amount_retained_iva || 0);
-  if (retainedIva <= 0) {
-    const pct = Number(formData.get("withholding_pct") || 75);
+  const { data: invLines } = await supabase
+    .from("invoice_lines")
+    .select("tax_rate, amount_untaxed, amount_tax")
+    .eq("invoice_id", invoiceId);
+
+  const taxed = (invLines || []).find((l) => Number(l.amount_tax || 0) > 0);
+  const ali = snapAlicuota(
+    Number(taxed?.tax_rate || 0) ||
+      (Number(invoice.amount_untaxed) > 0
+        ? (Number(invoice.amount_tax) / Number(invoice.amount_untaxed)) * 100
+        : 16),
+  );
+  const pct = Number(formData.get("withholding_pct") || 75) || 75;
+  const base = Number(invoice.amount_untaxed || 0);
+  if (base <= 0) {
+    return {
+      error: "La factura no tiene base imponible. No se puede retener IVA.",
+    };
+  }
+  const retainedIva = seniatIvaWithheld(base, ali, pct);
+
+  if (Number(invoice.amount_retained_iva || 0) !== retainedIva) {
     const applied = await applyIvaRetentionPct(invoiceId, pct);
     if (!applied.ok) return { error: applied.error };
-    retainedIva = applied.retained;
   }
 
   const { data: existingWh } = await supabase
@@ -102,7 +126,7 @@ export async function createIvaWithholding(
     amount_untaxed: invoice.amount_untaxed,
     amount_withheld: retainedIva,
     amount_exempt: invoice.amount_exempt,
-    alicuota: 16,
+    alicuota: ali,
     expediente: invoice.import_file_number || "0",
   });
 
@@ -155,6 +179,13 @@ export async function exportIvaTxt(
   if (error) return { error: error.message };
   if (!headers?.length) return { error: "No hay retenciones en ese período." };
 
+  const agentRif = formatRif99035(company.rif);
+  if (agentRif.length !== 10) {
+    return {
+      error: `El RIF de la empresa debe tener 10 caracteres para SENIAT (letra + 9 dígitos). Ahora: ${company.rif || "(vacío)"}.`,
+    };
+  }
+
   const lines = [];
   for (const wh of headers) {
     const partner = wh.partners as unknown as
@@ -178,23 +209,33 @@ export async function exportIvaTxt(
     }>;
 
     for (const line of whLines) {
+      const base = Number(line.amount_untaxed || 0);
+      const ali = Number(line.alicuota || 16);
+      const stored = Number(line.amount_withheld || 0);
+      const partnerRif = formatRif99035(p?.rif || "");
+      if (partnerRif.length !== 10) {
+        return {
+          error: `RIF del proveedor/cliente inválido para SENIAT (debe ser letra + 9 dígitos, ej. J123456789). Factura ${line.invoice_number}: ${p?.rif || "(vacío)"}. Corrígelo en Terceros.`,
+        };
+      }
       lines.push({
-        agentRif: company.rif,
+        agentRif,
         period: wh.period,
         invoiceDate: line.invoice_date || wh.voucher_date,
         operationType: line.operation_type,
         docType: line.doc_type,
-        partnerRif: p?.rif || "",
+        partnerRif,
         invoiceNumber: line.invoice_number,
         controlNumber: line.control_number || "0",
         amountTotal: Number(line.amount_total),
-        amountUntaxed: Number(line.amount_untaxed),
-        amountWithheld: Number(line.amount_withheld),
+        amountUntaxed: base,
+        amountWithheld: stored,
         affectedDocument: line.affected_document || "0",
         voucherNumber: wh.voucher_number,
         amountExempt: Number(line.amount_exempt || 0),
-        alicuota: Number(line.alicuota || 16),
+        alicuota: ali,
         expediente: line.expediente || "0",
+        retentionPct: 75,
       });
     }
   }
