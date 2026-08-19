@@ -404,8 +404,81 @@ function revalidateAll() {
   revalidatePath("/app/invoices");
   revalidatePath("/app/receivables");
   revalidatePath("/app/payables");
+  revalidatePath("/app/withholdings");
   revalidatePath("/app/accounts");
   revalidatePath("/app");
+}
+
+/** Aplica % de retención IVA sobre el impuesto de una factura ya guardada. */
+export async function applyIvaRetentionPct(
+  invoiceId: string,
+  pct: number,
+): Promise<{ ok: true; retained: number } | { ok: false; error: string }> {
+  const company = await getActiveCompany();
+  if (!company) return { ok: false, error: "Sin empresa activa." };
+  if (!(pct > 0) || pct > 100) {
+    return { ok: false, error: "Indica un % de retención IVA entre 0.01 y 100 (típico 75)." };
+  }
+
+  const supabase = await createClient();
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select(
+      "id, state, amount_tax, amount_total, amount_retained_islr, amount_paid",
+    )
+    .eq("id", invoiceId)
+    .eq("company_id", company.id)
+    .maybeSingle();
+
+  if (!invoice) return { ok: false, error: "Factura no encontrada." };
+  if (invoice.state === "cancelled") {
+    return { ok: false, error: "La factura está anulada." };
+  }
+
+  const tax = Number(invoice.amount_tax || 0);
+  if (tax <= 0) {
+    return {
+      ok: false,
+      error: "Esta factura no tiene IVA (exenta o SDCF). No aplica retención IVA.",
+    };
+  }
+
+  const retained = Number(((tax * pct) / 100).toFixed(2));
+  const residual = Number(
+    (
+      Number(invoice.amount_total || 0) -
+      retained -
+      Number(invoice.amount_retained_islr || 0) -
+      Number(invoice.amount_paid || 0)
+    ).toFixed(2),
+  );
+
+  const { error } = await supabase
+    .from("invoices")
+    .update({
+      amount_retained_iva: retained,
+      amount_residual: residual,
+      payment_state: residual <= 0 ? "paid" : "not_paid",
+    })
+    .eq("id", invoiceId)
+    .eq("company_id", company.id);
+
+  if (error) return { ok: false, error: error.message };
+  revalidateAll();
+  return { ok: true, retained };
+}
+
+export async function updateInvoiceIvaRetention(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const invoiceId = String(formData.get("invoice_id") || "");
+  const pct = Number(formData.get("withholding_pct") || 0);
+  const result = await applyIvaRetentionPct(invoiceId, pct);
+  if (!result.ok) return { error: result.error };
+  return {
+    success: `Retención IVA actualizada: ${result.retained.toFixed(2)} Bs (${pct}%).`,
+  };
 }
 
 async function cancelInvoiceRow(

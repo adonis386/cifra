@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { CancelInvoiceButton } from "@/components/invoices/cancel-invoice-button";
+import { EditIvaRetentionForm } from "@/components/invoices/edit-iva-retention-form";
 import { ReportExportActions } from "@/components/report-export-actions";
 import {
   formatDual,
@@ -188,7 +189,16 @@ export default async function InvoicesPage() {
                         ? formatDual(inv.amount_total, rate)
                         : formatMoney(inv.amount_total)}
                     </Td>
-                    <Td className="text-right font-mono">{formatMoney(inv.amount_retained_iva)}</Td>
+                    <Td className="text-right">
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="font-mono">{formatMoney(inv.amount_retained_iva)}</div>
+                        <EditIvaRetentionForm
+                          invoiceId={inv.id}
+                          amountTax={Number(inv.amount_tax || 0)}
+                          currentRetained={Number(inv.amount_retained_iva || 0)}
+                        />
+                      </div>
+                    </Td>
                     <Td className="text-right font-mono">
                       {formatMoney(inv.amount_retained_islr)}
                     </Td>

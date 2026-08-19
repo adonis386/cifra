@@ -5,6 +5,7 @@ import { getActiveCompany, periodFromDate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { buildIvaTxt99035, formatVoucherNumber } from "@/lib/seniat/txt-iva";
 import { nextCompanySequence } from "@/lib/actions/sequences";
+import { applyIvaRetentionPct } from "@/lib/actions/invoices";
 
 export type ActionState = { error?: string; success?: string; txt?: string };
 
@@ -34,10 +35,13 @@ export async function createIvaWithholding(
     .single();
 
   if (invErr || !invoice) return { error: "Factura no encontrada." };
-  if (!invoice.amount_retained_iva || Number(invoice.amount_retained_iva) <= 0) {
-    return {
-      error: "La factura no tiene IVA retenido. Edítala con % de retención.",
-    };
+
+  let retainedIva = Number(invoice.amount_retained_iva || 0);
+  if (retainedIva <= 0) {
+    const pct = Number(formData.get("withholding_pct") || 75);
+    const applied = await applyIvaRetentionPct(invoiceId, pct);
+    if (!applied.ok) return { error: applied.error };
+    retainedIva = applied.retained;
   }
 
   const { data: existingWh } = await supabase
@@ -76,7 +80,7 @@ export async function createIvaWithholding(
       state: "confirmed",
       amount_untaxed: invoice.amount_untaxed,
       amount_tax: invoice.amount_tax,
-      amount_withheld: invoice.amount_retained_iva,
+      amount_withheld: retainedIva,
       created_by: user?.id,
     })
     .select("id")
@@ -96,7 +100,7 @@ export async function createIvaWithholding(
     invoice_date: invoice.invoice_date,
     amount_total: invoice.amount_total,
     amount_untaxed: invoice.amount_untaxed,
-    amount_withheld: invoice.amount_retained_iva,
+    amount_withheld: retainedIva,
     amount_exempt: invoice.amount_exempt,
     alicuota: 16,
     expediente: invoice.import_file_number || "0",

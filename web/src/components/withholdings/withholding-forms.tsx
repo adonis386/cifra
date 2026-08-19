@@ -89,6 +89,21 @@ export function WithholdingHub({
               <Label htmlFor="voucher_date">Fecha</Label>
               <Input id="voucher_date" name="voucher_date" type="date" required defaultValue={today} />
             </div>
+            <div>
+              <Label htmlFor="withholding_pct">% ret. IVA</Label>
+              <Input
+                id="withholding_pct"
+                name="withholding_pct"
+                type="number"
+                min="0.01"
+                max="100"
+                step="0.01"
+                defaultValue="75"
+              />
+              <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+                Si la factura se guardó sin retención, aquí se aplica el % (75% típico en compras) y se crea el comprobante.
+              </p>
+            </div>
             <FieldError message={ivaState.error} />
             {ivaState.success && <p className="text-sm text-[var(--color-accent)]">{ivaState.success}</p>}
             <Button type="submit" disabled={ivaPending || !invoices.length}>
