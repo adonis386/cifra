@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useState, useTransition } from "rea
 import Link from "next/link";
 import { createInvoice, type ActionState } from "@/lib/actions/invoices";
 import { nextControlNumber } from "@/lib/actions/rates";
+import { calcIslrWithholding, islrRateLabel } from "@/lib/seniat/islr-calc";
 import { Button, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
 
@@ -17,6 +18,7 @@ type IslrRate = {
   rate: number;
   subtract_ut: number;
   base_percent?: number;
+  minimum_ut?: number;
 };
 type Product = {
   id: string;
@@ -200,17 +202,15 @@ export function InvoiceForm({
             r.person_type === partnerPersonType,
         ) || islrRates.find((r) => r.concept_id === l.line.conceptId);
       if (!rate) continue;
-      const base = Number(l.untaxed || l.exempt || 0);
-      const basePct = Number(rate.base_percent || 100) / 100;
-      const subtractBs = Number(rate.subtract_ut || 0) * taxUnitAmount;
-      const taxable = Math.max(base * basePct - subtractBs, 0);
-      const amount = Number(((taxable * Number(rate.rate || 0)) / 100).toFixed(2));
-      retainedIslr += amount;
-      const label = `${Number(rate.rate)}%${
-        rate.subtract_ut > 0
-          ? ` + sustr. ${Number(rate.subtract_ut)} UT`
-          : ""
-      }`;
+      const calc = calcIslrWithholding({
+        base: Number(l.untaxed || l.exempt || 0),
+        rate: Number(rate.rate || 0),
+        basePercent: Number(rate.base_percent || 100),
+        minimumUt: Number(rate.minimum_ut || 0),
+        utAmount: taxUnitAmount,
+      });
+      retainedIslr += calc.withheld;
+      const label = islrRateLabel(rate);
       if (!islrParts.includes(label)) islrParts.push(label);
     }
     const effectivePct = tax <= 0 ? 0 : Number(withholdingPct || 0);
@@ -658,9 +658,7 @@ export function InvoiceForm({
                     <option value="">Sin retención ISLR</option>
                     {islrConcepts.map((c) => {
                       const r = rateForConcept(c.id);
-                      const extra = r
-                        ? ` (${r.rate}%${r.subtract_ut > 0 ? ` + sustr. ${r.subtract_ut} UT` : ""})`
-                        : "";
+                      const extra = r ? ` (${islrRateLabel(r)})` : "";
                       return (
                         <option key={c.id} value={c.id}>
                           {c.code} — {c.name}

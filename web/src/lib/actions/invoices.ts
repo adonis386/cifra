@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getActiveCompany, periodFromDate, toUsd } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { seniatIvaWithheld, snapAlicuota } from "@/lib/seniat/txt-iva";
+import { calcIslrWithholding } from "@/lib/seniat/islr-calc";
 
 export type ActionState = { error?: string; success?: string };
 
@@ -198,7 +199,7 @@ export async function createInvoice(
         .maybeSingle(),
       supabase
         .from("islr_rates")
-        .select("concept_id, person_type, rate, base_percent, subtract_ut")
+        .select("concept_id, person_type, rate, base_percent, subtract_ut, minimum_ut")
         .in("concept_id", conceptIds)
         .eq("active", true),
       supabase
@@ -219,13 +220,14 @@ export async function createInvoice(
         ) ||
         (rates || []).find((r) => r.concept_id === line.concept_id);
       if (!rate) continue;
-      const base = Number(line.untaxed || line.exempt || 0);
-      const basePct = Number(rate.base_percent || 100) / 100;
-      const subtract = Number(rate.subtract_ut || 0) * utAmount;
-      const taxable = Math.max(base * basePct - subtract, 0);
-      finalRetainedIslr += Number(
-        ((taxable * Number(rate.rate || 0)) / 100).toFixed(2),
-      );
+      const calc = calcIslrWithholding({
+        base: Number(line.untaxed || line.exempt || 0),
+        rate: Number(rate.rate || 0),
+        basePercent: Number(rate.base_percent || 100),
+        minimumUt: Number(rate.minimum_ut || 0),
+        utAmount,
+      });
+      finalRetainedIslr += calc.withheld;
     }
     finalRetainedIslr = Number(finalRetainedIslr.toFixed(2));
   }

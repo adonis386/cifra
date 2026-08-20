@@ -20,7 +20,7 @@ export default async function PrintIslrPage({
   if (!company) notFound();
 
   const supabase = await createClient();
-  const [{ data: fullCompany }, { data: wh }] = await Promise.all([
+  const [{ data: fullCompany }, first] = await Promise.all([
     supabase
       .from("companies")
       .select("id, name, rif, address, phone")
@@ -29,12 +29,25 @@ export default async function PrintIslrPage({
     supabase
       .from("withholding_islr")
       .select(
-        "id, voucher_number, period, voucher_date, amount_untaxed, amount_withheld, partners(name, rif, address, phone, person_type), withholding_islr_lines(amount_untaxed, amount_withheld, rate, concept_id, islr_concepts(code, name), invoices(invoice_number, control_number, invoice_date))",
+        "id, voucher_number, period, voucher_date, amount_untaxed, amount_withheld, partners(name, rif, address, phone, person_type), withholding_islr_lines(amount_untaxed, amount_withheld, amount_subtract, rate, concept_id, islr_concepts(code, name), invoices(invoice_number, control_number, invoice_date))",
       )
       .eq("id", id)
       .eq("company_id", company.id)
       .single(),
   ]);
+
+  let wh = first.data;
+  if (!wh && first.error) {
+    const retry = await supabase
+      .from("withholding_islr")
+      .select(
+        "id, voucher_number, period, voucher_date, amount_untaxed, amount_withheld, partners(name, rif, address, phone, person_type), withholding_islr_lines(amount_untaxed, amount_withheld, rate, concept_id, islr_concepts(code, name), invoices(invoice_number, control_number, invoice_date))",
+      )
+      .eq("id", id)
+      .eq("company_id", company.id)
+      .single();
+    wh = retry.data;
+  }
 
   if (!wh) notFound();
 
@@ -58,6 +71,7 @@ export default async function PrintIslrPage({
   const lines = (wh.withholding_islr_lines || []) as Array<{
     amount_untaxed: number;
     amount_withheld: number;
+    amount_subtract?: number;
     rate: number;
     islr_concepts: { code: string; name: string } | { code: string; name: string }[] | null;
     invoices:
@@ -70,6 +84,10 @@ export default async function PrintIslrPage({
     border: "1px solid #222",
     padding: "6px 8px",
   };
+  const subtractTotal = lines.reduce(
+    (s, l) => s + Number(l.amount_subtract || 0),
+    0,
+  );
   const personLabel =
     p?.person_type === "natural" ? "Natural" : "Jurídica";
 
@@ -185,7 +203,7 @@ export default async function PrintIslrPage({
                 </td>
                 <td style={{ textAlign: "right" }}>{Number(l.rate).toFixed(2)}</td>
                 <td style={{ textAlign: "right" }}>{formatMoney(l.amount_untaxed)}</td>
-                <td style={{ textAlign: "right" }}>{formatMoney(0)}</td>
+                <td style={{ textAlign: "right" }}>{formatMoney(l.amount_subtract || 0)}</td>
                 <td style={{ textAlign: "right" }}>{formatMoney(l.amount_withheld)}</td>
               </tr>
             );
@@ -193,12 +211,23 @@ export default async function PrintIslrPage({
         </tbody>
       </table>
 
+      <p style={{ marginTop: 8, fontSize: 9 }}>
+        (1) Sustraendo persona natural residente: valor UT × % retención × 83.3334.
+        Impuesto retenido (2) = (base × %) − sustraendo.
+      </p>
+
       <table style={{ width: "100%", marginTop: 14, maxWidth: 420, marginLeft: "auto" }}>
         <tbody>
           <tr>
             <td style={{ padding: "4px 8px" }}>Total Base Imponible Bs.</td>
             <td style={{ textAlign: "right", fontWeight: 700, padding: "4px 8px" }}>
               {formatMoney(wh.amount_untaxed)}
+            </td>
+          </tr>
+          <tr>
+            <td style={{ padding: "4px 8px" }}>Total Sustraendo (1) Bs.</td>
+            <td style={{ textAlign: "right", fontWeight: 700, padding: "4px 8px" }}>
+              {formatMoney(subtractTotal)}
             </td>
           </tr>
           <tr>

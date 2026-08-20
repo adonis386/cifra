@@ -144,7 +144,7 @@ export async function cloneGlobalCatalogs(): Promise<ActionState> {
     if (!created) continue;
     const { data: rates } = await supabase
       .from("islr_rates")
-      .select("person_type, rate, subtract_ut")
+      .select("person_type, rate, subtract_ut, minimum_ut, base_percent, code")
       .eq("concept_id", g.id);
     if (rates?.length) {
       await supabase.from("islr_rates").insert(
@@ -153,6 +153,9 @@ export async function cloneGlobalCatalogs(): Promise<ActionState> {
           person_type: r.person_type,
           rate: r.rate,
           subtract_ut: r.subtract_ut ?? 0,
+          minimum_ut: (r as { minimum_ut?: number }).minimum_ut ?? 0,
+          base_percent: (r as { base_percent?: number }).base_percent ?? 100,
+          code: (r as { code?: string }).code ?? null,
           active: true,
         })),
       );

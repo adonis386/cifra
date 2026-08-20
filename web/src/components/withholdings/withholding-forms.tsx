@@ -5,6 +5,7 @@ import { createIvaWithholding, exportIvaTxt } from "@/lib/actions/withholdings";
 import { createIslrWithholding, exportIslrXml } from "@/lib/actions/islr";
 import { Button, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
+import { islrRateLabel } from "@/lib/seniat/islr-calc";
 
 type InvoiceOption = { id: string; label: string; partnerId?: string };
 type Concept = { id: string; code: string; name: string };
@@ -14,6 +15,7 @@ type Rate = {
   person_type: string;
   rate: number;
   subtract_ut?: number;
+  minimum_ut?: number;
   code: string | null;
 };
 
@@ -171,10 +173,7 @@ export function WithholdingHub({
               <Select id="rate_id" name="rate_id" required disabled={!filteredRates.length}>
                 {filteredRates.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.person_type} · {r.rate}%
-                    {Number(r.subtract_ut || 0) > 0
-                      ? ` + sustr. ${r.subtract_ut} UT`
-                      : ""}
+                    {r.person_type} · {islrRateLabel(r)}
                     {r.code ? ` · ${r.code}` : ""}
                   </option>
                 ))}

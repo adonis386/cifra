@@ -72,7 +72,7 @@ export default async function InvoicesPage() {
         .order("code"),
       supabase
         .from("islr_rates")
-        .select("concept_id, person_type, rate, subtract_ut, base_percent")
+        .select("concept_id, person_type, rate, subtract_ut, base_percent, minimum_ut")
         .eq("active", true),
       supabase
         .from("tax_units")
@@ -133,6 +133,9 @@ export default async function InvoicesPage() {
             rate: Number(r.rate || 0),
             subtract_ut: Number(r.subtract_ut || 0),
             base_percent: Number(r.base_percent || 100),
+            minimum_ut: Number(
+              (r as { minimum_ut?: number }).minimum_ut || 0,
+            ),
           }))}
           products={productList}
           initialRate={rate || 0}

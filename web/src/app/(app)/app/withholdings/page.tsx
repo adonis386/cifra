@@ -57,7 +57,7 @@ export default async function WithholdingsPage() {
       .order("code"),
     supabase
       .from("islr_rates")
-      .select("id, concept_id, person_type, rate, subtract_ut, code")
+      .select("id, concept_id, person_type, rate, subtract_ut, minimum_ut, code")
       .eq("active", true),
   ]);
 
@@ -75,6 +75,7 @@ export default async function WithholdingsPage() {
       person_type: r.person_type,
       rate: Number(r.rate || 0),
       subtract_ut: Number(r.subtract_ut || 0),
+      minimum_ut: Number((r as { minimum_ut?: number }).minimum_ut || 0),
       code: r.code || null,
     }));
 

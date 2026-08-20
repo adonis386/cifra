@@ -5,6 +5,7 @@ import { getActiveCompany, periodFromDate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { buildIslrXml } from "@/lib/seniat/xml-islr";
 import { nextCompanySequence } from "@/lib/actions/sequences";
+import { calcIslrWithholding } from "@/lib/seniat/islr-calc";
 
 export type ActionState = { error?: string; success?: string; xml?: string };
 
@@ -46,10 +47,14 @@ export async function createIslrWithholding(
   if (!rate) return { error: "Tarifa ISLR no encontrada." };
 
   const utAmount = Number(ut?.amount || 0);
-  const subtract = Number(rate.subtract_ut || 0) * utAmount;
-  const basePct = Number(rate.base_percent || 100) / 100;
-  const taxable = Math.max(baseAmount * basePct - subtract, 0);
-  const withheld = Number(((taxable * Number(rate.rate)) / 100).toFixed(2));
+  const calc = calcIslrWithholding({
+    base: baseAmount,
+    rate: Number(rate.rate || 0),
+    basePercent: Number(rate.base_percent || 100),
+    minimumUt: Number(rate.minimum_ut || 0),
+    utAmount,
+  });
+  const withheld = calc.withheld;
   const period = periodFromDate(voucherDate);
   const seq = await nextCompanySequence("wh_islr", { period, padding: 8 });
   if (!seq.ok) return { error: seq.error };
@@ -64,7 +69,7 @@ export async function createIslrWithholding(
       period,
       voucher_date: voucherDate,
       state: "confirmed",
-      amount_untaxed: taxable,
+      amount_untaxed: calc.taxableBase,
       amount_withheld: withheld,
       created_by: user?.id,
     })
@@ -73,16 +78,26 @@ export async function createIslrWithholding(
 
   if (error) return { error: error.message };
 
-  const { error: lineErr } = await supabase.from("withholding_islr_lines").insert({
+  const linePayload: Record<string, unknown> = {
     withholding_id: wh.id,
     company_id: company.id,
     invoice_id: invoice.id,
     concept_id: conceptId,
     rate: rate.rate,
-    amount_untaxed: taxable,
+    amount_untaxed: calc.taxableBase,
     amount_withheld: withheld,
-  });
-  if (lineErr) return { error: lineErr.message };
+    amount_subtract: calc.subtract,
+  };
+  const { error: lineErr } = await supabase
+    .from("withholding_islr_lines")
+    .insert(linePayload);
+  if (lineErr && /amount_subtract|column/i.test(lineErr.message)) {
+    delete linePayload.amount_subtract;
+    const retry = await supabase.from("withholding_islr_lines").insert(linePayload);
+    if (retry.error) return { error: retry.error.message };
+  } else if (lineErr) {
+    return { error: lineErr.message };
+  }
 
   const prevIslr = Number(invoice.amount_retained_islr || 0);
   await supabase
