@@ -55,19 +55,29 @@ export default async function EntriesPage() {
       <PageHeader
         eyebrow="Libro"
         title="Asientos"
-        description="Partida doble de Cifra: lo que genera facturas/pagos y los ajustes manuales. Sin jerga de ‘apuntes’."
+        description="Lo que generan las facturas y los pagos, y los ajustes manuales."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <ManualEntryForm
+              accounts={accounts || []}
+              journals={journals || []}
+              partners={partners || []}
+            />
+            <Link
+              href="/app/ledger"
+              className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+            >
+              Mayor
+            </Link>
+            <Link
+              href="/app/accounts"
+              className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+            >
+              Cuentas
+            </Link>
+          </div>
+        }
       />
-
-      <SectionCard
-        title="Nuevo asiento manual"
-        description="Para apertura, reclasificación o ajuste. Debe cuadrar débito = crédito."
-      >
-        <ManualEntryForm
-          accounts={accounts || []}
-          journals={journals || []}
-          partners={partners || []}
-        />
-      </SectionCard>
 
       <SectionCard title="Libro de asientos">
         {(moves || []).length ? (
@@ -118,18 +128,10 @@ export default async function EntriesPage() {
         ) : (
           <EmptyState
             title="Sin asientos"
-            description="Registra facturas o publica un asiento manual."
+            description="Registra facturas o publica un asiento de ajuste."
           />
         )}
       </SectionCard>
-
-      <p className="text-xs text-[var(--color-muted-foreground)]">
-        El mayor por cuenta está en{" "}
-        <Link href="/app/ledger" className="font-semibold text-[var(--color-primary)] underline">
-          Mayor
-        </Link>
-        .
-      </p>
     </div>
   );
 }

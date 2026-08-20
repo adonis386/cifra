@@ -47,6 +47,7 @@ export async function createMunicipalWithholding(
 
   if (error) return { error: error.message };
   revalidatePath("/app/municipal");
+  revalidatePath("/app/withholdings");
   return { success: `Comprobante municipal ${voucherNumber}` };
 }
 

@@ -159,7 +159,7 @@ export async function createBankStatement(
   } = await supabase.auth.getUser();
 
   const label =
-    name || `Extracto ${statementDate}`;
+    name || `Corte ${statementDate}`;
 
   const { data: st, error } = await supabase
     .from("bank_statements")
@@ -181,7 +181,7 @@ export async function createBankStatement(
     if (/bank_statements|schema cache|column/i.test(error.message)) {
       return {
         error:
-          "Los extractos no están disponibles. Revisa la conexión a la base.",
+          "Los cortes de banco no están disponibles. Revisa la conexión a la base.",
       };
     }
     return { error: error.message };
@@ -198,7 +198,7 @@ export async function createBankStatement(
 
   revalidatePath("/app/treasury");
   revalidatePath("/app/audit");
-  return { success: `Extracto "${label}" creado.` };
+  return { success: `Corte "${label}" creado.` };
 }
 
 export async function addBankStatementLine(
@@ -289,7 +289,7 @@ export async function addBankStatementLine(
   return {
     success: reconciled
       ? "Línea agregada y conciliada con el pago."
-      : "Línea de extracto agregada.",
+      : "Línea agregada.",
   };
 }
 

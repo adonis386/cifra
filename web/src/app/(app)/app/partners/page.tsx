@@ -19,7 +19,7 @@ export default async function PartnersPage() {
   if (!company) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Terceros" description="Registra clientes y proveedores con RIF." />
+        <PageHeader title="Clientes y proveedores" description="Registra clientes y proveedores con RIF." />
         <EmptyState title="Sin empresa" description="Crea una empresa para continuar." />
         <Link href="/app/empresa/nueva" className="text-sm font-semibold text-[var(--color-primary)] underline">
           Crear empresa
@@ -38,14 +38,11 @@ export default async function PartnersPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Maestros"
-        title="Terceros"
-        description="Clientes y proveedores con RIF para facturas, libros y retenciones."
+        eyebrow="Operar"
+        title="Clientes y proveedores"
+        description="RIF para facturas, libros y retenciones."
+        actions={<PartnerForm />}
       />
-
-      <SectionCard title="Nuevo tercero" description="Datos fiscales mínimos del partner.">
-        <PartnerForm />
-      </SectionCard>
 
       <SectionCard title="Listado">
         {(partners || []).length ? (
@@ -66,7 +63,13 @@ export default async function PartnersPage() {
                   <Td className="font-medium">{p.name}</Td>
                   <Td className="font-mono text-xs">{p.rif}</Td>
                   <Td>
-                    <Badge tone="primary">{p.kind}</Badge>
+                    <Badge tone="primary">
+                      {p.kind === "customer"
+                        ? "Cliente"
+                        : p.kind === "supplier"
+                          ? "Proveedor"
+                          : "Ambos"}
+                    </Badge>
                   </Td>
                   <Td className="capitalize">{p.person_type}</Td>
                   <Td className="text-[var(--color-muted-foreground)]">{p.phone || p.email || "—"}</Td>
@@ -83,7 +86,7 @@ export default async function PartnersPage() {
             </tbody>
           </DataTable>
         ) : (
-          <EmptyState title="Sin terceros" description="Agrega el primero con el formulario de arriba." />
+          <EmptyState title="Sin registros" description="Pulsa Nuevo para agregar el primero." />
         )}
       </SectionCard>
     </div>

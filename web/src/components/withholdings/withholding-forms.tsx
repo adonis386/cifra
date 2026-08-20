@@ -7,27 +7,16 @@ import { Button, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
 
 type InvoiceOption = { id: string; label: string; partnerId?: string };
-type Concept = { id: string; code: string; name: string };
-type Rate = {
-  id: string;
-  concept_id: string;
-  person_type: string;
-  rate: number;
-  subtract_ut?: number;
-  minimum_ut?: number;
-  code: string | null;
-};
 
 export function WithholdingHub({
+  panel,
   ivaInvoices,
   islrInvoices,
 }: {
+  panel: "iva" | "islr";
   ivaInvoices: InvoiceOption[];
   islrInvoices: InvoiceOption[];
-  concepts?: Concept[];
-  rates?: Rate[];
 }) {
-  const [tab, setTab] = useState<"iva" | "islr">("iva");
   const [ivaState, ivaAction, ivaPending] = useActionState(createIvaWithholding, {});
   const [txtState, txtAction, txtPending] = useActionState(exportIvaTxt, {});
   const [islrState, islrAction, islrPending] = useActionState(createIslrWithholding, {});
@@ -46,27 +35,7 @@ export function WithholdingHub({
 
   return (
     <div className="space-y-6">
-      <div className="flex w-fit gap-1 border border-[var(--color-border)] bg-[var(--color-muted)] p-1">
-        {[
-          { id: "iva" as const, label: "IVA · TXT 99035" },
-          { id: "islr" as const, label: "ISLR · XML" },
-        ].map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold transition-colors duration-200 ${
-              tab === t.id
-                ? "bg-[var(--color-primary)] text-white"
-                : "text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "iva" ? (
+      {panel === "iva" ? (
         <div className="grid gap-8 lg:grid-cols-2">
           <form action={ivaAction} className="space-y-3">
             <h3 className="font-semibold">Comprobante IVA</h3>

@@ -64,19 +64,21 @@ export default async function PaymentsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Contabilidad"
-        title="Pagos y cobros"
-        description="Aplica el cobro o el pago a facturas abiertas (FIFO o una factura)."
-        actions={<ReportExportActions xlsxHref="/api/export/payments" />}
+        eyebrow="Operar"
+        title="Cobros y pagos"
+        description="Aplica el cobro o el pago a facturas abiertas."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <PaymentForm
+              partners={partners || []}
+              journals={journals || []}
+              invoices={invoiceOptions}
+              initialRate={rate || 0}
+            />
+            <ReportExportActions xlsxHref="/api/export/payments" />
+          </div>
+        }
       />
-      <SectionCard title="Registrar" description="Inbound = cobro clientes · Outbound = pago proveedores.">
-        <PaymentForm
-          partners={partners || []}
-          journals={journals || []}
-          invoices={invoiceOptions}
-          initialRate={rate || 0}
-        />
-      </SectionCard>
       <SectionCard title="Últimos movimientos">
         {(payments || []).length ? (
           <DataTable>

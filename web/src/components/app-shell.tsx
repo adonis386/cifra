@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BookOpen,
-  Building2,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -13,14 +12,7 @@ import {
   Landmark,
   Users,
   Wallet,
-  CircleDollarSign,
-  HandCoins,
-  Scale,
-  BarChart3,
   ScrollText,
-  Library,
-  ClipboardList,
-  ShieldCheck,
 } from "lucide-react";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { signOut } from "@/lib/actions/auth";
@@ -33,10 +25,8 @@ const groups = [
     label: "Operar",
     items: [
       { href: "/app", label: "Inicio", icon: LayoutDashboard },
-      { href: "/app/partners", label: "Terceros", icon: Users },
       { href: "/app/invoices", label: "Facturas", icon: FileText },
-      { href: "/app/receivables", label: "Por cobrar", icon: CircleDollarSign },
-      { href: "/app/payables", label: "Por pagar", icon: HandCoins },
+      { href: "/app/partners", label: "Clientes / proveedores", icon: Users },
       { href: "/app/payments", label: "Cobros / Pagos", icon: Wallet },
     ],
   },
@@ -45,19 +35,13 @@ const groups = [
     items: [
       { href: "/app/treasury", label: "Tesorería", icon: Landmark },
       { href: "/app/entries", label: "Asientos", icon: ScrollText },
-      { href: "/app/ledger", label: "Mayor", icon: Library },
-      { href: "/app/statements", label: "Estado de cuenta", icon: ClipboardList },
-      { href: "/app/accounts", label: "Plan", icon: Scale },
-      { href: "/app/reports", label: "Reportes", icon: BarChart3 },
-      { href: "/app/audit", label: "Auditoría", icon: ShieldCheck },
     ],
   },
   {
     label: "Cumplir",
     items: [
-      { href: "/app/books", label: "Libros fiscales", icon: BookOpen },
+      { href: "/app/books", label: "Libros", icon: BookOpen },
       { href: "/app/withholdings", label: "Retenciones", icon: Receipt },
-      { href: "/app/municipal", label: "Municipal", icon: Landmark },
     ],
   },
 ];
@@ -167,18 +151,9 @@ export function AppShell({
             companies={companies}
             activeCompanyId={activeCompanyId || active?.id}
           />
-          <div className="flex items-center gap-3">
-            <span className="hidden max-w-[180px] truncate text-xs text-[var(--color-muted-foreground)] sm:inline">
-              {email}
-            </span>
-            <Link
-              href="/app/empresa/nueva"
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--color-foreground)] transition-colors duration-200 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-            >
-              <Building2 className="h-3.5 w-3.5" aria-hidden />
-              Nueva empresa
-            </Link>
-          </div>
+          <span className="hidden max-w-[180px] truncate text-xs text-[var(--color-muted-foreground)] sm:inline">
+            {email}
+          </span>
         </header>
 
         <main className="cifra-motion-in flex-1 px-4 py-6 pb-24 md:px-10 md:py-8 md:pb-10">

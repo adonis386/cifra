@@ -72,9 +72,15 @@ export default async function AccountsPage() {
       <PageHeader
         eyebrow="Libro"
         title="Plan de cuentas"
-        description="Catálogo VE de Cifra (activo, pasivo, ingreso, gasto) y orígenes de asiento. El balance de comprobación vive aquí."
+        description="Catálogo VE (activo, pasivo, ingreso, gasto) y balance de comprobación."
         actions={
           <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/app/entries"
+              className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+            >
+              Asientos
+            </Link>
             <ReportExportActions
               pdfHref="/print/trial-balance"
               xlsxHref="/api/export/trial-balance"

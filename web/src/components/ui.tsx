@@ -65,3 +65,61 @@ export function FieldError({ message }: { message?: string }) {
     </p>
   );
 }
+
+export function Dialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  wide = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cifra-dialog-title"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-[color-mix(in_srgb,var(--color-foreground)_40%,transparent)]"
+        aria-label="Cerrar"
+        onClick={onClose}
+      />
+      <div
+        className={`relative z-10 w-full overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5 ${
+          wide ? "max-h-[90vh] max-w-4xl" : "max-h-[90vh] max-w-lg"
+        }`}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2
+              id="cifra-dialog-title"
+              className="text-lg font-semibold tracking-tight"
+            >
+              {title}
+            </h2>
+            {description ? (
+              <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+                {description}
+              </p>
+            ) : null}
+          </div>
+          <Button type="button" variant="ghost" className="shrink-0 px-2" onClick={onClose}>
+            Cerrar
+          </Button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}

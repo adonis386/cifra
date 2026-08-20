@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { createManualEntry, type ActionState } from "@/lib/actions/entries";
-import { Button, FieldError, Input, Label } from "@/components/ui";
+import { Button, Dialog, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
 
 type Account = { id: string; code: string; name: string };
@@ -40,6 +40,7 @@ export function ManualEntryForm({
   journals: Journal[];
   partners: Partner[];
 }) {
+  const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(createManualEntry, initial);
   const today = new Date().toISOString().slice(0, 10);
   const misc = journals.find((j) => j.journal_type === "general") || journals[0];
@@ -59,15 +60,30 @@ export function ManualEntryForm({
     };
   }, [lines]);
 
-  if (!accounts.length) {
-    return (
-      <p className="text-sm text-[var(--color-muted-foreground)]">
-        Primero genera el plan de cuentas en Libro → Plan.
-      </p>
-    );
-  }
+  useEffect(() => {
+    if (!state.success) return;
+    const t = window.setTimeout(() => setOpen(false), 700);
+    return () => window.clearTimeout(t);
+  }, [state.success]);
 
   return (
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        Asiento de ajuste
+      </Button>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Asiento de ajuste"
+        description="Apertura, reclasificación o corrección. Debe cuadrar débito = crédito."
+        wide
+      >
+        {!accounts.length ? (
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            Primero genera el plan de cuentas en Configuración → Cuentas, o pulsa
+            Regenerar plan VE.
+          </p>
+        ) : (
     <form action={action} className="space-y-4">
       <input
         type="hidden"
@@ -261,5 +277,8 @@ export function ManualEntryForm({
         {pending ? "Publicando…" : "Publicar asiento"}
       </Button>
     </form>
+        )}
+      </Dialog>
+    </>
   );
 }

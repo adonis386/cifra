@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { registerPayment, type ActionState } from "@/lib/actions/accounting";
-import { Button, FieldError, Input, Label } from "@/components/ui";
+import { Button, Dialog, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
 
 type Partner = { id: string; name: string; rif: string };
@@ -29,10 +29,17 @@ export function PaymentForm({
   defaultType?: "inbound" | "outbound";
   initialRate?: number;
 }) {
+  const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(registerPayment, initial);
   const [paymentType, setPaymentType] = useState<"inbound" | "outbound">(defaultType);
   const [partnerId, setPartnerId] = useState(partners[0]?.id || "");
   const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    if (!state.success) return;
+    const t = window.setTimeout(() => setOpen(false), 700);
+    return () => window.clearTimeout(t);
+  }, [state.success]);
 
   const filteredInvoices = useMemo(
     () => invoices.filter((i) => i.partnerId === partnerId),
@@ -43,16 +50,24 @@ export function PaymentForm({
     ["bank", "cash"].includes(j.journal_type),
   );
 
-  if (!partners.length) {
-    return (
-      <p className="text-sm text-[var(--color-muted-foreground)]">
-        Necesitas terceros con facturas abiertas.
-      </p>
-    );
-  }
-
   return (
-    <form action={action} className="grid gap-3 md:grid-cols-2">
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        Registrar cobro o pago
+      </Button>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Registrar cobro o pago"
+        description="Aplica a facturas abiertas, en orden o a una factura."
+        wide
+      >
+        {!partners.length ? (
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            Primero registra un cliente o proveedor.
+          </p>
+        ) : (
+    <form action={action} className="grid gap-3 sm:grid-cols-2">
       <div>
         <Label htmlFor="payment_type">Tipo</Label>
         <Select
@@ -61,12 +76,12 @@ export function PaymentForm({
           value={paymentType}
           onChange={(e) => setPaymentType(e.target.value as "inbound" | "outbound")}
         >
-          <option value="inbound">Cobro (CxC)</option>
-          <option value="outbound">Pago (CxP)</option>
+          <option value="inbound">Cobro</option>
+          <option value="outbound">Pago</option>
         </Select>
       </div>
       <div>
-        <Label htmlFor="partner_id">Tercero</Label>
+        <Label htmlFor="partner_id">Cliente / proveedor</Label>
         <Select
           id="partner_id"
           name="partner_id"
@@ -103,7 +118,7 @@ export function PaymentForm({
         />
       </div>
       <div>
-        <Label htmlFor="journal_id">Diario</Label>
+        <Label htmlFor="journal_id">Caja / banco</Label>
         <Select id="journal_id" name="journal_id" defaultValue={bankJournals[0]?.id || ""}>
           {bankJournals.map((j) => (
             <option key={j.id} value={j.id}>
@@ -137,9 +152,12 @@ export function PaymentForm({
           <p className="mb-2 text-sm text-[var(--color-accent)]">{state.success}</p>
         )}
         <Button type="submit" disabled={pending}>
-          {pending ? "Registrando…" : "Registrar pago"}
+          {pending ? "Registrando…" : "Registrar"}
         </Button>
       </div>
     </form>
+        )}
+      </Dialog>
+    </>
   );
 }

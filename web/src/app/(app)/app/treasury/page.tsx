@@ -101,14 +101,20 @@ export default async function TreasuryPage() {
       <PageHeader
         eyebrow="Libro"
         title="Caja y bancos"
-        description="Saldos de caja y banco, extractos y conciliación con cobros y pagos."
+        description="Saldos de caja y banco, y conciliación con cobros y pagos."
         actions={
-          <Link
-            href="/app/payments"
-            className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
-          >
-            Registrar cobro/pago
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <LiquidityJournalForm />
+            {!migrationNeeded ? (
+              <StatementCreateForm journals={journals || []} initialRate={rate || 0} />
+            ) : null}
+            <Link
+              href="/app/payments"
+              className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+            >
+              Registrar cobro/pago
+            </Link>
+          </div>
         }
       />
 
@@ -135,32 +141,12 @@ export default async function TreasuryPage() {
         {!journals?.length && (
           <EmptyState
             title="Sin caja/banco"
-            description="Agrega un banco abajo o regenera el plan VE en Libro → Plan."
+            description="Usa Agregar banco o caja arriba."
           />
         )}
       </div>
 
-      <SectionCard
-        title="Agregar banco o caja"
-        description="Banesco, Mercantil, caja chica… cada uno con su saldo y extracto."
-      >
-        <LiquidityJournalForm />
-      </SectionCard>
-
-      <SectionCard
-        title="Nuevo extracto"
-        description="Carga el corte del banco o arqueo de caja para ir conciliando."
-      >
-        {migrationNeeded ? (
-          <p className="text-sm text-[var(--color-destructive)]">
-            Los extractos no están disponibles. Revisa la conexión a la base.
-          </p>
-        ) : (
-          <StatementCreateForm journals={journals || []} initialRate={rate || 0} />
-        )}
-      </SectionCard>
-
-      <SectionCard title="Extractos">
+      <SectionCard title="Conciliaciones">
         {statements.length ? (
           <div className="space-y-6">
             {statements.map((st) => {
@@ -190,7 +176,10 @@ export default async function TreasuryPage() {
                         {j ? `${j.code} · ${j.name}` : "—"} · {st.statement_date}
                       </p>
                     </div>
-                    <Badge>{st.state}</Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge>{st.state}</Badge>
+                      <StatementLineForm statementId={st.id} payments={payments} />
+                    </div>
                   </div>
                   <div className="mb-4 grid gap-2 sm:grid-cols-3 text-sm">
                     <p>
@@ -202,7 +191,7 @@ export default async function TreasuryPage() {
                       <span className="font-mono">{formatMoney(sumLines)}</span>
                     </p>
                     <p>
-                      Final extracto:{" "}
+                      Final del banco:{" "}
                       <span className="font-mono">{formatMoney(st.balance_end)}</span>
                     </p>
                   </div>
@@ -239,25 +228,21 @@ export default async function TreasuryPage() {
                       </tbody>
                     </DataTable>
                   ) : (
-                    <p className="mb-3 text-sm text-[var(--color-muted-foreground)]">
+                    <p className="text-sm text-[var(--color-muted-foreground)]">
                       Sin líneas todavía.
                     </p>
                   )}
-
-                  <div className="mt-4">
-                    <StatementLineForm statementId={st.id} payments={payments} />
-                  </div>
                 </div>
               );
             })}
           </div>
         ) : (
           <EmptyState
-            title="Sin extractos"
+            title="Sin conciliaciones"
             description={
               migrationNeeded
-                ? "No hay extractos en esta empresa."
-                : "Crea el primer extracto arriba."
+                ? "No hay cortes en esta empresa."
+                : "Crea el primer corte arriba."
             }
           />
         )}

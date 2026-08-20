@@ -110,12 +110,20 @@ export default async function LedgerPage({
         title="Mayor"
         description="Movimientos por cuenta contable, con saldo corrido y dual $ / Bs cuando hay tasa BCV."
         actions={
-          accountId ? (
-            <ReportExportActions
-              pdfHref={`/print/ledger?account=${accountId}&from=${from}&to=${to}`}
-              xlsxHref={`/api/export/ledger?account=${accountId}&from=${from}&to=${to}`}
-            />
-          ) : undefined
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/app/entries"
+              className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+            >
+              Asientos
+            </Link>
+            {accountId ? (
+              <ReportExportActions
+                pdfHref={`/print/ledger?account=${accountId}&from=${from}&to=${to}`}
+                xlsxHref={`/api/export/ledger?account=${accountId}&from=${from}&to=${to}`}
+              />
+            ) : null}
+          </div>
         }
       />
 

@@ -148,6 +148,18 @@ export default async function InvoicesPage({
             >
               Nueva factura
             </Link>
+            <Link
+              href="/app/receivables"
+              className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+            >
+              Por cobrar
+            </Link>
+            <Link
+              href="/app/payables"
+              className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+            >
+              Por pagar
+            </Link>
             <ReportExportActions xlsxHref={exportHref} />
           </div>
         }

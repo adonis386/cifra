@@ -86,6 +86,29 @@ export default async function ConfigPage() {
       />
 
       <SectionCard
+        title="Libro"
+        description="Pantallas que no están en el menú diario."
+      >
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold">
+          <Link href="/app/accounts" className="text-[var(--color-primary)] underline-offset-4 hover:underline">
+            Cuentas
+          </Link>
+          <Link href="/app/ledger" className="text-[var(--color-primary)] underline-offset-4 hover:underline">
+            Mayor
+          </Link>
+          <Link href="/app/statements" className="text-[var(--color-primary)] underline-offset-4 hover:underline">
+            Estado de cuenta
+          </Link>
+          <Link href="/app/audit" className="text-[var(--color-primary)] underline-offset-4 hover:underline">
+            Auditoría
+          </Link>
+          <Link href="/app/reports" className="text-[var(--color-primary)] underline-offset-4 hover:underline">
+            Reportes
+          </Link>
+        </div>
+      </SectionCard>
+
+      <SectionCard
         title="Empresa y membrete"
         description="Nombre, correo, logo y pie en facturas y reportes PDF."
       >

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTransition } from "react";
 import { ChevronsUpDown } from "lucide-react";
 import { setActiveCompany } from "@/lib/actions/active-company";
@@ -21,9 +22,12 @@ export function CompanySwitcher({
     return (
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold">Sin empresa</p>
-        <p className="truncate text-xs text-[var(--color-muted-foreground)]">
-          Crea tu primera empresa
-        </p>
+        <Link
+          href="/app/empresa/nueva"
+          className="text-xs font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+        >
+          Crear empresa
+        </Link>
       </div>
     );
   }
@@ -35,6 +39,12 @@ export function CompanySwitcher({
         <p className="truncate font-mono text-xs text-[var(--color-muted-foreground)]">
           {active.rif}
         </p>
+        <Link
+          href="/app/empresa/nueva"
+          className="mt-1 inline-block text-[11px] font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+        >
+          Nueva empresa
+        </Link>
       </div>
     );
   }
@@ -78,6 +88,12 @@ export function CompanySwitcher({
           {pending ? "Cambiando…" : `Activa · ${active.rif}`}
         </p>
       ) : null}
+      <Link
+        href="/app/empresa/nueva"
+        className="mt-1 inline-block text-[11px] font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+      >
+        Nueva empresa
+      </Link>
     </form>
   );
 }

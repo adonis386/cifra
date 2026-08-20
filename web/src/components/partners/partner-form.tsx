@@ -6,7 +6,7 @@ import {
   type ActionState,
   type PartnerValues,
 } from "@/lib/actions/partners";
-import { Button, FieldError, Input, Label } from "@/components/ui";
+import { Button, Dialog, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
 
 const empty: PartnerValues = {
@@ -22,6 +22,7 @@ const empty: PartnerValues = {
 const initial: ActionState = {};
 
 export function PartnerForm() {
+  const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(createPartner, initial);
   const [form, setForm] = useState<PartnerValues>(empty);
   const [resetToken, setResetToken] = useState(state.success);
@@ -34,6 +35,8 @@ export function PartnerForm() {
     if (state.success && state.success !== resetToken) {
       setResetToken(state.success);
       setForm(empty);
+      const t = window.setTimeout(() => setOpen(false), 700);
+      return () => window.clearTimeout(t);
     }
   }, [state.success, resetToken]);
 
@@ -49,7 +52,17 @@ export function PartnerForm() {
   }
 
   return (
-    <form action={action} className="grid gap-3 md:grid-cols-2">
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        Nuevo
+      </Button>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Nuevo cliente o proveedor"
+        description="Datos fiscales mínimos para facturas, libros y retenciones."
+      >
+    <form action={action} className="grid gap-3 sm:grid-cols-2">
       <div className="md:col-span-2">
         <Label htmlFor="name">Nombre / Razón social</Label>
         <Input
@@ -132,12 +145,14 @@ export function PartnerForm() {
           <p className="mb-2 text-sm text-[var(--color-accent)]">Tercero guardado.</p>
         )}
         <Button type="submit" disabled={pending}>
-          {pending ? "Guardando…" : "Guardar tercero"}
+          {pending ? "Guardando…" : "Guardar"}
         </Button>
         <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
           No se permiten RIF/cédula duplicados en la misma empresa.
         </p>
       </div>
     </form>
+      </Dialog>
+    </>
   );
 }

@@ -251,7 +251,7 @@ export default async function AppHomePage() {
                   : "Sin retenciones";
               href = "/app/withholdings";
             } else {
-              href = "/app/municipal";
+              href = "/app/withholdings?tab=municipal";
               status = "Declaración municipal";
             }
             return (
