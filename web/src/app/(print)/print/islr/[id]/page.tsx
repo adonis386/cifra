@@ -46,7 +46,7 @@ export default async function PrintIslrPage({
       .eq("id", id)
       .eq("company_id", company.id)
       .single();
-    wh = retry.data;
+    wh = retry.data as typeof first.data;
   }
 
   if (!wh) notFound();
