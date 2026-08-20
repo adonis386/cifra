@@ -237,11 +237,11 @@ export async function loadTrialBalance() {
   return { ...ctx, rows };
 }
 
-export async function loadInvoicesList() {
+export async function loadInvoicesList(tipo?: string) {
   const ctx = await requireCompanyContext();
   if (!ctx) return null;
 
-  const { data: invoices } = await ctx.supabase
+  let query = ctx.supabase
     .from("invoices")
     .select(
       "invoice_date, move_type, invoice_number, control_number, amount_untaxed, amount_tax, amount_total, amount_retained_iva, amount_residual, payment_state, currency_code, exchange_rate, partners(name, rif)",
@@ -249,6 +249,13 @@ export async function loadInvoicesList() {
     .eq("company_id", ctx.company.id)
     .order("invoice_date", { ascending: false })
     .limit(2000);
+  if (tipo === "ventas") {
+    query = query.in("move_type", ["out_invoice", "out_refund"]);
+  } else if (tipo === "compras") {
+    query = query.in("move_type", ["in_invoice", "in_refund"]);
+  }
+
+  const { data: invoices } = await query;
 
   const moveLabel: Record<string, string> = {
     in_invoice: "Compra",

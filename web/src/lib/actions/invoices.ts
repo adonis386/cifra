@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getActiveCompany, periodFromDate, toUsd, getActiveTaxUnit } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { seniatIvaWithheld, snapAlicuota } from "@/lib/seniat/txt-iva";
-import { calcIslrWithholding } from "@/lib/seniat/islr-calc";
+import { calcIslrFromTabla } from "@/lib/seniat/islr-catalog";
 
 export type ActionState = { error?: string; success?: string };
 
@@ -191,33 +191,26 @@ export async function createInvoice(
     ...new Set(normalized.map((l) => l.concept_id).filter(Boolean) as string[]),
   ];
   if (conceptIds.length) {
-    const [{ data: partner }, { data: rates }, utAmount] = await Promise.all([
+    const [{ data: partner }, { data: conceptRows }, utAmount] = await Promise.all([
       supabase
         .from("partners")
         .select("person_type")
         .eq("id", partnerId)
         .maybeSingle(),
       supabase
-        .from("islr_rates")
-        .select("concept_id, person_type, rate, base_percent, subtract_ut, minimum_ut")
-        .in("concept_id", conceptIds)
-        .eq("active", true),
+        .from("islr_concepts")
+        .select("id, code")
+        .in("id", conceptIds),
       getActiveTaxUnit(company.id, invoiceDate),
     ]);
     const personType = partner?.person_type === "natural" ? "natural" : "juridica";
+    const codeById = new Map((conceptRows || []).map((c) => [c.id, c.code]));
     for (const line of normalized) {
       if (!line.concept_id) continue;
-      const rate =
-        (rates || []).find(
-          (r) => r.concept_id === line.concept_id && r.person_type === personType,
-        ) ||
-        (rates || []).find((r) => r.concept_id === line.concept_id);
-      if (!rate) continue;
-      const calc = calcIslrWithholding({
+      const calc = calcIslrFromTabla({
         base: Number(line.untaxed || line.exempt || 0),
-        rate: Number(rate.rate || 0),
-        basePercent: Number(rate.base_percent || 100),
-        minimumUt: Number(rate.minimum_ut || 0),
+        conceptCode: codeById.get(line.concept_id) || null,
+        personType,
         utAmount,
       });
       finalRetainedIslr += calc.withheld;
@@ -327,6 +320,14 @@ export async function createInvoice(
   if (lineErr) return { error: lineErr };
 
   await tryPostAccounting(invoice.id);
+  if (finalRetainedIslr > 0) {
+    try {
+      const { ensureIslrWithholdingForInvoice } = await import("@/lib/actions/islr");
+      await ensureIslrWithholdingForInvoice(invoice.id);
+    } catch {
+      /* comprobante se puede generar después en Retenciones */
+    }
+  }
   try {
     const { writeAuditLog } = await import("@/lib/actions/audit");
     await writeAuditLog({

@@ -4,7 +4,8 @@ import { useActionState, useEffect, useMemo, useState, useTransition } from "rea
 import Link from "next/link";
 import { createInvoice, type ActionState } from "@/lib/actions/invoices";
 import { nextControlNumber } from "@/lib/actions/rates";
-import { calcIslrWithholding, islrRateLabel } from "@/lib/seniat/islr-calc";
+import { islrRateLabel } from "@/lib/seniat/islr-calc";
+import { calcIslrFromTabla } from "@/lib/seniat/islr-catalog";
 import { Button, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
 
@@ -202,15 +203,18 @@ export function InvoiceForm({
             r.person_type === partnerPersonType,
         ) || islrRates.find((r) => r.concept_id === l.line.conceptId);
       if (!rate) continue;
-      const calc = calcIslrWithholding({
+      const calc = calcIslrFromTabla({
         base: Number(l.untaxed || l.exempt || 0),
-        rate: Number(rate.rate || 0),
-        basePercent: Number(rate.base_percent || 100),
-        minimumUt: Number(rate.minimum_ut || 0),
+        conceptCode: islrConcepts.find((c) => c.id === l.line.conceptId)?.code,
+        personType: partnerPersonType,
         utAmount: taxUnitAmount,
       });
       retainedIslr += calc.withheld;
-      const label = islrRateLabel(rate);
+      const label = islrRateLabel({
+        rate: Number(rate.rate || 0),
+        minimum_ut: Number(rate.minimum_ut || 0),
+        subtract_ut: Number(rate.subtract_ut || 0),
+      });
       if (!islrParts.includes(label)) islrParts.push(label);
     }
     const effectivePct = tax <= 0 ? 0 : Number(withholdingPct || 0);
@@ -228,6 +232,7 @@ export function InvoiceForm({
   }, [
     computedLines,
     withholdingPct,
+    islrConcepts,
     islrRates,
     partnerPersonType,
     taxUnitAmount,
@@ -656,7 +661,14 @@ export function InvoiceForm({
                     aria-label="Concepto ISLR"
                   >
                     <option value="">Sin retención ISLR</option>
-                    {islrConcepts.map((c) => {
+                    {islrConcepts
+                      .filter((c) => {
+                        if (!c.code || c.code === "000") return true;
+                        const r = rateForConcept(c.id);
+                        if (!r) return false;
+                        return r.person_type === partnerPersonType;
+                      })
+                      .map((c) => {
                       const r = rateForConcept(c.id);
                       const extra = r ? ` (${islrRateLabel(r)})` : "";
                       return (

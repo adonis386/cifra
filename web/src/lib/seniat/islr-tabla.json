@@ -1,0 +1,502 @@
+[
+  {
+    "code": "001",
+    "name": "Sueldos, salarios y demás remuneraciones similares",
+    "person_type": "natural",
+    "rate": 0.0,
+    "minimum_ut": 0,
+    "withholdable": false,
+    "sustraendo": "Según ARI",
+    "pct_raw": "Según ARI"
+  },
+  {
+    "code": "002",
+    "name": "Honorarios profesionales no mercantiles (PN Residente)",
+    "person_type": "natural",
+    "rate": 3.0,
+    "minimum_ut": 83.3334,
+    "withholdable": true,
+    "sustraendo": "83.3334* valor de UT",
+    "pct_raw": "3%"
+  },
+  {
+    "code": "003",
+    "name": "Honorarios profesionales no mercantiles (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "004",
+    "name": "Honorarios profesionales no mercantiles (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 5.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "5%"
+  },
+  {
+    "code": "005",
+    "name": "Honorarios profesionales no mercantiles (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "006",
+    "name": "Comisiones pagadas por la enajenación de bienes inmuebles (PN Residente)",
+    "person_type": "natural",
+    "rate": 3.0,
+    "minimum_ut": 83.3334,
+    "withholdable": true,
+    "sustraendo": "83.3334* valor de UT*% ret",
+    "pct_raw": "3%"
+  },
+  {
+    "code": "007",
+    "name": "Comisiones pagadas por la enajenación de bienes inmuebles (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "008",
+    "name": "Comisiones pagadas por la enajenación de bienes inmuebles (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 5.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "5%"
+  },
+  {
+    "code": "009",
+    "name": "Comisiones pagadas por la enajenación de bienes inmuebles (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "010",
+    "name": "Intereses de capitales, préstamos u otros créditos de instituciones financieras (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 4.95,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "4.95%"
+  },
+  {
+    "code": "011",
+    "name": "Intereses de capitales, préstamos u otros créditos de otras personas (PN Residente)",
+    "person_type": "natural",
+    "rate": 3.0,
+    "minimum_ut": 83.3334,
+    "withholdable": true,
+    "sustraendo": "83.3334* valor de UT*% ret",
+    "pct_raw": "3%"
+  },
+  {
+    "code": "012",
+    "name": "Intereses de capitales, préstamos u otros créditos de otras personas (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "013",
+    "name": "Intereses de capitales, préstamos u otros créditos de otras personas (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 5.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "5%"
+  },
+  {
+    "code": "014",
+    "name": "Intereses de capitales, préstamos u otros créditos de otras personas (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "015",
+    "name": "Ejecución de obras o prestación de servicios en Venezuela (PN Residente)",
+    "person_type": "natural",
+    "rate": 1.0,
+    "minimum_ut": 83.3334,
+    "withholdable": true,
+    "sustraendo": "83.3334* valor de UT*% ret",
+    "pct_raw": "1%"
+  },
+  {
+    "code": "016",
+    "name": "Ejecución de obras o prestación de servicios en Venezuela (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "017",
+    "name": "Ejecución de obras o prestación de servicios en Venezuela (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 2.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "2%"
+  },
+  {
+    "code": "018",
+    "name": "Comisiones mercantiles distintas a sueldos y salarios (PN Residente)",
+    "person_type": "natural",
+    "rate": 3.0,
+    "minimum_ut": 83.3334,
+    "withholdable": true,
+    "sustraendo": "83.3334* valor de UT*% ret",
+    "pct_raw": "3%"
+  },
+  {
+    "code": "019",
+    "name": "Comisiones mercantiles distintas a sueldos y salarios (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "020",
+    "name": "Comisiones mercantiles distintas a sueldos y salarios (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 5.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "5%"
+  },
+  {
+    "code": "021",
+    "name": "Comisiones mercantiles distintas a sueldos y salarios (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "022",
+    "name": "Arrendamiento de bienes inmuebles sitos en el país (PN Residente)",
+    "person_type": "natural",
+    "rate": 3.0,
+    "minimum_ut": 83.3334,
+    "withholdable": true,
+    "sustraendo": "83.3334* valor de UT*% ret",
+    "pct_raw": "3%"
+  },
+  {
+    "code": "023",
+    "name": "Arrendamiento de bienes inmuebles sitos en el país (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "024",
+    "name": "Arrendamiento de bienes inmuebles sitos en el país (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 5.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "5%"
+  },
+  {
+    "code": "025",
+    "name": "Arrendamiento de bienes inmuebles sitos en el país (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "026",
+    "name": "Arrendamiento de bienes muebles sitos en el país (PN Residente)",
+    "person_type": "natural",
+    "rate": 3.0,
+    "minimum_ut": 83.3334,
+    "withholdable": true,
+    "sustraendo": "83.3334* valor de UT*% ret",
+    "pct_raw": "3%"
+  },
+  {
+    "code": "027",
+    "name": "Arrendamiento de bienes muebles sitos en el país (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "028",
+    "name": "Arrendamiento de bienes muebles sitos en el país (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 5.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "5%"
+  },
+  {
+    "code": "029",
+    "name": "Arrendamiento de bienes muebles sitos en el país (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "030",
+    "name": "Fletes o servicios de transporte nacional (PN Residente)",
+    "person_type": "natural",
+    "rate": 1.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "1%"
+  },
+  {
+    "code": "031",
+    "name": "Fletes o servicios de transporte nacional (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "032",
+    "name": "Fletes o servicios de transporte nacional (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 2.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "2%"
+  },
+  {
+    "code": "033",
+    "name": "Fletes o servicios de transporte nacional (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "034",
+    "name": "Fletes o servicios de transporte internacional (PN Residente)",
+    "person_type": "natural",
+    "rate": 1.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "1%"
+  },
+  {
+    "code": "035",
+    "name": "Fletes o servicios de transporte internacional (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "036",
+    "name": "Fletes o servicios de transporte internacional (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 2.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "2%"
+  },
+  {
+    "code": "037",
+    "name": "Fletes o servicios de transporte internacional (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "038",
+    "name": "Premios de loterías, de rifas y de hipódromos (PN Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "039",
+    "name": "Premios de loterías, de rifas y de hipódromos (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "040",
+    "name": "Premios de loterías, de rifas y de hipódromos (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "041",
+    "name": "Premios de loterías, de rifas y de hipódromos (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "042",
+    "name": "Ganancias de apuestas (PN Residente)",
+    "person_type": "natural",
+    "rate": 16.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "16%"
+  },
+  {
+    "code": "043",
+    "name": "Ganancias de apuestas (PN No Residente)",
+    "person_type": "natural",
+    "rate": 16.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "16%"
+  },
+  {
+    "code": "044",
+    "name": "Ganancias de apuestas (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 16.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "16%"
+  },
+  {
+    "code": "045",
+    "name": "Ganancias de apuestas (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 16.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "16%"
+  },
+  {
+    "code": "046",
+    "name": "Adquisición de fondos de comercio (PN Residente)",
+    "person_type": "natural",
+    "rate": 3.0,
+    "minimum_ut": 83.3334,
+    "withholdable": true,
+    "sustraendo": "83.3334* valor de UT*% ret",
+    "pct_raw": "3%"
+  },
+  {
+    "code": "047",
+    "name": "Adquisición de fondos de comercio (PN No Residente)",
+    "person_type": "natural",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "048",
+    "name": "Adquisición de fondos de comercio (PJ Domiciliada)",
+    "person_type": "juridica",
+    "rate": 5.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "5%"
+  },
+  {
+    "code": "049",
+    "name": "Adquisición de fondos de comercio (PJ No Domiciliada)",
+    "person_type": "juridica",
+    "rate": 34.0,
+    "minimum_ut": 0,
+    "withholdable": true,
+    "sustraendo": "No aplica",
+    "pct_raw": "34%"
+  },
+  {
+    "code": "050",
+    "name": "Pagos por publicidad y propaganda (PN Residente)",
+    "person_type": "natural",
+    "rate": 3.0,
+    "minimum_ut": 83.3334,
+    "withholdable": true,
+    "sustraendo": "83.3334* valor de UT*% ret",
+    "pct_raw": "3%"
+  }
+]

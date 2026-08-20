@@ -28,8 +28,14 @@ const moveLabel: Record<string, string> = {
   out_refund: "N/C venta",
 };
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tipo?: string }>;
+}) {
   const company = await getActiveCompany();
+  const params = await searchParams;
+  const tipo = params.tipo === "ventas" || params.tipo === "compras" ? params.tipo : "todas";
   if (!company) {
     return (
       <div className="space-y-6">
@@ -43,6 +49,19 @@ export default async function InvoicesPage() {
 
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
+  const saleTypes = ["out_invoice", "out_refund"];
+  const purchaseTypes = ["in_invoice", "in_refund"];
+  let invoiceQuery = supabase
+    .from("invoices")
+    .select(
+      "id, move_type, state, invoice_date, invoice_number, control_number, amount_untaxed, amount_tax, amount_total, amount_retained_iva, amount_retained_islr, exchange_rate, amount_total_usd, sin_cred, currency_code, partners(name, rif)",
+    )
+    .eq("company_id", company.id)
+    .neq("state", "cancelled")
+    .order("invoice_date", { ascending: false });
+  if (tipo === "ventas") invoiceQuery = invoiceQuery.in("move_type", saleTypes);
+  if (tipo === "compras") invoiceQuery = invoiceQuery.in("move_type", purchaseTypes);
+
   const [
     { data: partners },
     { data: invoices },
@@ -57,14 +76,7 @@ export default async function InvoicesPage() {
         .select("id, name, rif, person_type")
         .eq("company_id", company.id)
         .order("name"),
-      supabase
-        .from("invoices")
-        .select(
-          "id, move_type, state, invoice_date, invoice_number, control_number, amount_untaxed, amount_tax, amount_total, amount_retained_iva, amount_retained_islr, exchange_rate, amount_total_usd, sin_cred, currency_code, partners(name, rif)",
-        )
-        .eq("company_id", company.id)
-        .neq("state", "cancelled")
-        .order("invoice_date", { ascending: false }),
+      invoiceQuery,
       supabase
         .from("islr_concepts")
         .select("id, code, name, withholdable, company_id")
@@ -111,7 +123,7 @@ export default async function InvoicesPage() {
         title="Facturas"
         description="Compras y ventas con control fiscal, multi-alícuota, dual $ / Bs y retenciones."
         actions={
-          <ReportExportActions xlsxHref="/api/export/invoices" />
+          <ReportExportActions xlsxHref={`/api/export/invoices?tipo=${tipo}`} />
         }
       />
 
@@ -139,6 +151,32 @@ export default async function InvoicesPage() {
       </SectionCard>
 
       <SectionCard title="Documentos">
+        <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Filtrar facturas">
+          {(
+            [
+              { id: "todas", label: "Todas" },
+              { id: "ventas", label: "Facturas venta" },
+              { id: "compras", label: "Facturas compra" },
+            ] as const
+          ).map((opt) => {
+            const active = tipo === opt.id;
+            return (
+              <Link
+                key={opt.id}
+                href={opt.id === "todas" ? "/app/invoices" : `/app/invoices?tipo=${opt.id}`}
+                role="tab"
+                aria-selected={active}
+                className={`rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold transition-colors ${
+                  active
+                    ? "bg-[var(--color-primary)] text-white"
+                    : "border border-[var(--color-border)] bg-white text-[var(--color-foreground)] hover:border-[var(--color-primary)]"
+                }`}
+              >
+                {opt.label}
+              </Link>
+            );
+          })}
+        </div>
         {(invoices || []).length ? (
           <DataTable>
             <thead>

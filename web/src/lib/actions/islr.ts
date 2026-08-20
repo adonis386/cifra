@@ -5,9 +5,154 @@ import { getActiveCompany, periodFromDate, getActiveTaxUnit } from "@/lib/compan
 import { createClient } from "@/lib/supabase/server";
 import { buildIslrXml } from "@/lib/seniat/xml-islr";
 import { nextCompanySequence } from "@/lib/actions/sequences";
-import { calcIslrWithholding } from "@/lib/seniat/islr-calc";
+import {
+  calcIslrFromTabla,
+  seniatConceptLabel,
+  seniatRateFor,
+  seniatXmlCode,
+} from "@/lib/seniat/islr-catalog";
 
 export type ActionState = { error?: string; success?: string; xml?: string };
+
+export type IslrComputedLine = {
+  invoiceId: string;
+  invoiceNumber: string;
+  controlNumber: string;
+  invoiceDate: string;
+  invoiceTotal: number;
+  conceptId: string | null;
+  conceptCode: string;
+  conceptName: string;
+  xmlCode: string;
+  rate: number;
+  base: number;
+  subtract: number;
+  withheld: number;
+};
+
+function unwrap<T>(raw: T | T[] | null | undefined): T | null {
+  if (!raw) return null;
+  return Array.isArray(raw) ? raw[0] || null : raw;
+}
+
+export async function computeIslrForInvoice(
+  invoiceId: string,
+  companyId: string,
+): Promise<{
+  error?: string;
+  partnerId?: string;
+  voucherDate?: string;
+  lines: IslrComputedLine[];
+  totalBase: number;
+  totalSubtract: number;
+  totalWithheld: number;
+}> {
+  const supabase = await createClient();
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select(
+      "id, partner_id, invoice_number, control_number, invoice_date, amount_total, amount_untaxed, amount_exempt, partners(person_type)",
+    )
+    .eq("id", invoiceId)
+    .eq("company_id", companyId)
+    .single();
+  if (!invoice) return { error: "Factura no encontrada.", lines: [], totalBase: 0, totalSubtract: 0, totalWithheld: 0 };
+
+  const partner = unwrap(
+    invoice.partners as { person_type?: string } | { person_type?: string }[] | null,
+  );
+  const personType = partner?.person_type === "natural" ? "natural" : "juridica";
+  const utAmount = await getActiveTaxUnit(companyId, invoice.invoice_date);
+
+  const { data: invLines } = await supabase
+    .from("invoice_lines")
+    .select(
+      "amount_untaxed, amount_total, concept_id, islr_concepts(id, code, name)",
+    )
+    .eq("invoice_id", invoice.id);
+
+  const lines: IslrComputedLine[] = [];
+  for (const row of invLines || []) {
+    const concept = unwrap(
+      row.islr_concepts as
+        | { id: string; code: string; name: string }
+        | { id: string; code: string; name: string }[]
+        | null,
+    );
+    if (!concept?.code || concept.code === "000") continue;
+    const base = Number(row.amount_untaxed || 0);
+    if (base <= 0) continue;
+    const tabla = seniatRateFor(concept.code, personType);
+    const calc = calcIslrFromTabla({
+      base,
+      conceptCode: concept.code,
+      personType,
+      utAmount,
+    });
+    if (!tabla?.withholdable && calc.withheld <= 0) continue;
+    const xmlCode = seniatXmlCode(concept.code, personType);
+    lines.push({
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoice_number,
+      controlNumber: invoice.control_number || "0",
+      invoiceDate: invoice.invoice_date,
+      invoiceTotal: Number(invoice.amount_total || 0),
+      conceptId: concept.id,
+      conceptCode: concept.code,
+      conceptName: seniatConceptLabel(concept.code, personType, concept.name),
+      xmlCode,
+      rate: Number(tabla?.rate || 0),
+      base: calc.taxableBase,
+      subtract: calc.subtract,
+      withheld: calc.withheld,
+    });
+  }
+
+  // Header fallback: factura con ISLR pero líneas sin concepto usable
+  if (!lines.length) {
+    const base = Number(invoice.amount_untaxed || invoice.amount_exempt || invoice.amount_total || 0);
+    if (base > 0) {
+      const calc = calcIslrFromTabla({
+        base,
+        conceptCode: personType === "natural" ? "002" : "004",
+        personType,
+        utAmount,
+      });
+      const xmlCode = seniatXmlCode(
+        personType === "natural" ? "002" : "004",
+        personType,
+      );
+      const tabla = seniatRateFor(xmlCode, personType);
+      lines.push({
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoice_number,
+        controlNumber: invoice.control_number || "0",
+        invoiceDate: invoice.invoice_date,
+        invoiceTotal: Number(invoice.amount_total || 0),
+        conceptId: null,
+        conceptCode: xmlCode,
+        conceptName: seniatConceptLabel(xmlCode, personType),
+        xmlCode,
+        rate: Number(tabla?.rate || 0),
+        base: calc.taxableBase,
+        subtract: calc.subtract,
+        withheld: calc.withheld,
+      });
+    }
+  }
+
+  const totalBase = Number(lines.reduce((s, l) => s + l.base, 0).toFixed(2));
+  const totalSubtract = Number(lines.reduce((s, l) => s + l.subtract, 0).toFixed(2));
+  const totalWithheld = Number(lines.reduce((s, l) => s + l.withheld, 0).toFixed(2));
+  return {
+    partnerId: invoice.partner_id,
+    voucherDate: invoice.invoice_date,
+    lines,
+    totalBase,
+    totalSubtract,
+    totalWithheld,
+  };
+}
 
 export async function createIslrWithholding(
   _prev: ActionState,
@@ -17,91 +162,149 @@ export async function createIslrWithholding(
   if (!company) return { error: "Crea una empresa primero." };
 
   const invoiceId = String(formData.get("invoice_id") || "");
-  const conceptId = String(formData.get("concept_id") || "");
-  const rateId = String(formData.get("rate_id") || "");
   const voucherDate = String(formData.get("voucher_date") || "");
-  const baseAmount = Number(formData.get("base_amount") || 0);
 
-  if (!invoiceId || !conceptId || !rateId || !voucherDate || baseAmount <= 0) {
-    return { error: "Completa factura, concepto, tarifa, fecha y base." };
+  if (!invoiceId || !voucherDate) {
+    return { error: "Completa factura y fecha del comprobante." };
   }
 
+  const computed = await computeIslrForInvoice(invoiceId, company.id);
+  if (computed.error) return { error: computed.error };
+  if (!computed.lines.length || computed.totalWithheld <= 0) {
+    return { error: "La factura no tiene retención ISLR calculable (concepto + base)." };
+  }
+
+  return persistIslrWithholding({
+    companyId: company.id,
+    invoiceId,
+    partnerId: computed.partnerId!,
+    voucherDate,
+    computed,
+  });
+}
+
+export async function ensureIslrWithholdingForInvoice(invoiceId: string) {
+  const company = await getActiveCompany();
+  if (!company) return;
+  const computed = await computeIslrForInvoice(invoiceId, company.id);
+  if (!computed.lines.length || computed.totalWithheld <= 0 || !computed.partnerId) {
+    return;
+  }
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("withholding_islr_lines")
+    .select("withholding_id")
+    .eq("invoice_id", invoiceId)
+    .limit(1)
+    .maybeSingle();
+  if (existing?.withholding_id) return;
+  await persistIslrWithholding({
+    companyId: company.id,
+    invoiceId,
+    partnerId: computed.partnerId,
+    voucherDate: computed.voucherDate || new Date().toISOString().slice(0, 10),
+    computed,
+  });
+}
+
+async function persistIslrWithholding(input: {
+  companyId: string;
+  invoiceId: string;
+  partnerId: string;
+  voucherDate: string;
+  computed: Awaited<ReturnType<typeof computeIslrForInvoice>>;
+}): Promise<ActionState> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const period = periodFromDate(input.voucherDate);
 
-  const [{ data: invoice }, { data: rate }, utAmount] = await Promise.all([
-    supabase.from("invoices").select("*").eq("id", invoiceId).eq("company_id", company.id).single(),
-    supabase.from("islr_rates").select("*, islr_concepts(code, name)").eq("id", rateId).single(),
-    getActiveTaxUnit(company.id, voucherDate),
-  ]);
+  const { data: existingLine } = await supabase
+    .from("withholding_islr_lines")
+    .select("withholding_id")
+    .eq("invoice_id", input.invoiceId)
+    .limit(1)
+    .maybeSingle();
 
-  if (!invoice) return { error: "Factura no encontrada." };
-  if (!rate) return { error: "Tarifa ISLR no encontrada." };
+  let withholdingId = existingLine?.withholding_id as string | undefined;
 
-  const calc = calcIslrWithholding({
-    base: baseAmount,
-    rate: Number(rate.rate || 0),
-    basePercent: Number(rate.base_percent || 100),
-    minimumUt: Number(rate.minimum_ut || 0),
-    utAmount,
+  if (withholdingId) {
+    await supabase
+      .from("withholding_islr")
+      .update({
+        voucher_date: input.voucherDate,
+        period,
+        amount_untaxed: input.computed.totalBase,
+        amount_withheld: input.computed.totalWithheld,
+        state: "confirmed",
+      })
+      .eq("id", withholdingId)
+      .eq("company_id", input.companyId);
+    await supabase
+      .from("withholding_islr_lines")
+      .delete()
+      .eq("withholding_id", withholdingId);
+  } else {
+    const seq = await nextCompanySequence("wh_islr", { period, padding: 8 });
+    if (!seq.ok) return { error: seq.error };
+    const voucherNumber = seq.value.replace(/\D/g, "").slice(0, 14);
+    const { data: wh, error } = await supabase
+      .from("withholding_islr")
+      .insert({
+        company_id: input.companyId,
+        partner_id: input.partnerId,
+        voucher_number: voucherNumber,
+        period,
+        voucher_date: input.voucherDate,
+        state: "confirmed",
+        amount_untaxed: input.computed.totalBase,
+        amount_withheld: input.computed.totalWithheld,
+        created_by: user?.id,
+      })
+      .select("id")
+      .single();
+    if (error) return { error: error.message };
+    withholdingId = wh.id;
+  }
+
+  const linePayloads = input.computed.lines.map((l) => {
+    const row: Record<string, unknown> = {
+      withholding_id: withholdingId!,
+      company_id: input.companyId,
+      invoice_id: input.invoiceId,
+      rate: l.rate,
+      amount_untaxed: l.base,
+      amount_withheld: l.withheld,
+      amount_subtract: l.subtract,
+    };
+    if (l.conceptId) row.concept_id = l.conceptId;
+    return row;
   });
-  const withheld = calc.withheld;
-  const period = periodFromDate(voucherDate);
-  const seq = await nextCompanySequence("wh_islr", { period, padding: 8 });
-  if (!seq.ok) return { error: seq.error };
-  const voucherNumber = seq.value.replace(/\D/g, "").slice(0, 14);
 
-  const { data: wh, error } = await supabase
-    .from("withholding_islr")
-    .insert({
-      company_id: company.id,
-      partner_id: invoice.partner_id,
-      voucher_number: voucherNumber,
-      period,
-      voucher_date: voucherDate,
-      state: "confirmed",
-      amount_untaxed: calc.taxableBase,
-      amount_withheld: withheld,
-      created_by: user?.id,
-    })
-    .select("id")
-    .single();
-
-  if (error) return { error: error.message };
-
-  const linePayload: Record<string, unknown> = {
-    withholding_id: wh.id,
-    company_id: company.id,
-    invoice_id: invoice.id,
-    concept_id: conceptId,
-    rate: rate.rate,
-    amount_untaxed: calc.taxableBase,
-    amount_withheld: withheld,
-    amount_subtract: calc.subtract,
-  };
   const { error: lineErr } = await supabase
     .from("withholding_islr_lines")
-    .insert(linePayload);
+    .insert(linePayloads);
   if (lineErr && /amount_subtract|column/i.test(lineErr.message)) {
-    delete linePayload.amount_subtract;
-    const retry = await supabase.from("withholding_islr_lines").insert(linePayload);
+    const retry = await supabase.from("withholding_islr_lines").insert(
+      linePayloads.map(({ amount_subtract: _s, ...rest }) => rest),
+    );
     if (retry.error) return { error: retry.error.message };
   } else if (lineErr) {
     return { error: lineErr.message };
   }
 
-  const prevIslr = Number(invoice.amount_retained_islr || 0);
   await supabase
     .from("invoices")
-    .update({ amount_retained_islr: Number((prevIslr + withheld).toFixed(2)) })
-    .eq("id", invoice.id);
+    .update({ amount_retained_islr: input.computed.totalWithheld })
+    .eq("id", input.invoiceId);
 
   revalidatePath("/app/withholdings");
   revalidatePath("/app/invoices");
   revalidatePath("/app/config");
-  return { success: `Comprobante ISLR ${voucherNumber} · retenido ${withheld.toFixed(2)} · ${Date.now()}` };
+  return {
+    success: `Comprobante ISLR · retenido ${input.computed.totalWithheld.toFixed(2)}`,
+  };
 }
 
 export async function exportIslrXml(
@@ -118,7 +321,7 @@ export async function exportIslrXml(
   const { data, error } = await supabase
     .from("withholding_islr")
     .select(
-      "voucher_date, period, partners(rif), withholding_islr_lines(amount_untaxed, rate, concept_id, islr_concepts(code), invoices(invoice_number, control_number, invoice_date))",
+      "id, voucher_date, period, partners(rif, person_type), withholding_islr_lines(invoice_id, amount_untaxed, rate, concept_id, islr_concepts(code), invoices(invoice_number, control_number, invoice_date))",
     )
     .eq("company_id", company.id)
     .eq("period", period)
@@ -127,10 +330,33 @@ export async function exportIslrXml(
   if (error) return { error: error.message };
   if (!data?.length) return { error: "No hay retenciones ISLR en ese período." };
 
-  const lines = [];
+  const xmlLines = [];
   for (const wh of data) {
-    const partner = wh.partners as unknown as { rif: string } | { rif: string }[] | null;
-    const p = Array.isArray(partner) ? partner[0] : partner;
+    const p = unwrap(
+      wh.partners as
+        | { rif: string; person_type?: string }
+        | { rif: string; person_type?: string }[]
+        | null,
+    );
+    const first = unwrap(
+      (wh.withholding_islr_lines || []) as Array<{ invoice_id?: string }>,
+    );
+    if (first?.invoice_id) {
+      const computed = await computeIslrForInvoice(first.invoice_id, company.id);
+      for (const line of computed.lines) {
+        xmlLines.push({
+          partnerRif: p?.rif || "",
+          invoiceNumber: line.invoiceNumber,
+          controlNumber: line.controlNumber,
+          operationDate: line.invoiceDate,
+          conceptCode: line.xmlCode,
+          baseAmount: line.base,
+          retentionPercent: line.rate,
+        });
+      }
+      continue;
+    }
+
     const whLines = (wh.withholding_islr_lines || []) as Array<{
       amount_untaxed: number;
       rate: number;
@@ -142,22 +368,20 @@ export async function exportIslrXml(
     }>;
 
     for (const line of whLines) {
-      const concept = Array.isArray(line.islr_concepts)
-        ? line.islr_concepts[0]
-        : line.islr_concepts;
-      const inv = Array.isArray(line.invoices) ? line.invoices[0] : line.invoices;
-      lines.push({
+      const concept = unwrap(line.islr_concepts);
+      const inv = unwrap(line.invoices);
+      xmlLines.push({
         partnerRif: p?.rif || "",
         invoiceNumber: inv?.invoice_number || "0",
         controlNumber: inv?.control_number || "0",
         operationDate: inv?.invoice_date || wh.voucher_date,
-        conceptCode: concept?.code || "000",
+        conceptCode: seniatXmlCode(concept?.code, p?.person_type),
         baseAmount: Number(line.amount_untaxed),
         retentionPercent: Number(line.rate),
       });
     }
   }
 
-  const xml = buildIslrXml({ agentRif: company.rif, period, lines });
-  return { success: `XML generado (${lines.length} detalle(s)).`, xml };
+  const xml = buildIslrXml({ agentRif: company.rif, period, lines: xmlLines });
+  return { success: `XML generado (${xmlLines.length} detalle(s)).`, xml };
 }

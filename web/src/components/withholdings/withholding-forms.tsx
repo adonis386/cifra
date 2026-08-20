@@ -1,11 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { createIvaWithholding, exportIvaTxt } from "@/lib/actions/withholdings";
 import { createIslrWithholding, exportIslrXml } from "@/lib/actions/islr";
 import { Button, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
-import { islrRateLabel } from "@/lib/seniat/islr-calc";
 
 type InvoiceOption = { id: string; label: string; partnerId?: string };
 type Concept = { id: string; code: string; name: string };
@@ -21,8 +20,6 @@ type Rate = {
 
 export function WithholdingHub({
   invoices,
-  concepts,
-  rates,
 }: {
   invoices: InvoiceOption[];
   concepts: Concept[];
@@ -35,7 +32,6 @@ export function WithholdingHub({
   const [xmlState, xmlAction, xmlPending] = useActionState(exportIslrXml, {});
   const [txt, setTxt] = useState("");
   const [xml, setXml] = useState("");
-  const [conceptId, setConceptId] = useState(concepts[0]?.id || "");
   const today = new Date().toISOString().slice(0, 10);
   const periodDefault = today.slice(0, 7);
 
@@ -45,11 +41,6 @@ export function WithholdingHub({
   useEffect(() => {
     if (xmlState.xml) setXml(xmlState.xml);
   }, [xmlState.xml]);
-
-  const filteredRates = useMemo(
-    () => rates.filter((r) => r.concept_id === conceptId),
-    [rates, conceptId],
-  );
 
   return (
     <div className="space-y-6">
@@ -142,6 +133,10 @@ export function WithholdingHub({
         <div className="grid gap-8 lg:grid-cols-2">
           <form action={islrAction} className="space-y-3">
             <h3 className="font-semibold">Comprobante ISLR</h3>
+            <p className="text-xs text-[var(--color-muted-foreground)]">
+              El cálculo sale de la factura (concepto, alícuota y sustraendo UT × % × 83.3334).
+              No se vuelve a elegir tarifa a mano.
+            </p>
             <div>
               <Label htmlFor="islr_invoice">Factura</Label>
               <Select id="islr_invoice" name="invoice_id" required>
@@ -153,50 +148,14 @@ export function WithholdingHub({
               </Select>
             </div>
             <div>
-              <Label htmlFor="concept_id">Concepto</Label>
-              <Select
-                id="concept_id"
-                name="concept_id"
-                required
-                value={conceptId}
-                onChange={(e) => setConceptId(e.target.value)}
-              >
-                {concepts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} — {c.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="rate_id">Tarifa</Label>
-              <Select id="rate_id" name="rate_id" required disabled={!filteredRates.length}>
-                {filteredRates.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.person_type} · {islrRateLabel(r)}
-                    {r.code ? ` · ${r.code}` : ""}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="base_amount">Base imponible ISLR</Label>
-              <Input id="base_amount" name="base_amount" type="number" step="0.01" min="0" required defaultValue="0" />
-            </div>
-            <div>
               <Label htmlFor="islr_date">Fecha</Label>
               <Input id="islr_date" name="voucher_date" type="date" required defaultValue={today} />
             </div>
             <FieldError message={islrState.error} />
             {islrState.success && <p className="text-sm text-[var(--color-accent)]">{islrState.success}</p>}
-            <Button type="submit" disabled={islrPending || !concepts.length}>
-              {islrPending ? "Guardando…" : "Crear comprobante ISLR"}
+            <Button type="submit" disabled={islrPending}>
+              {islrPending ? "Guardando…" : "Crear / actualizar comprobante ISLR"}
             </Button>
-            {!concepts.length && (
-              <p className="text-xs text-[var(--color-muted-foreground)]">
-                Ve a Configuración y clona el catálogo ISLR.
-              </p>
-            )}
           </form>
 
           <form action={xmlAction} className="space-y-3">
