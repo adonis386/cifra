@@ -44,8 +44,104 @@ export async function ensureCompanyAccounting(
   });
   if (error) return { error: error.message };
   revalidatePath("/app/accounts");
+  revalidatePath("/app/treasury");
   revalidatePath("/app/config");
   return { success: "Plan de cuentas y diarios listos." };
+}
+
+function nextCode(existing: string[], prefix: string) {
+  const used = new Set(existing.map((c) => c.toUpperCase()));
+  if (!used.has(prefix)) return prefix;
+  for (let i = 2; i < 100; i++) {
+    const code = `${prefix}${i}`;
+    if (!used.has(code)) return code;
+  }
+  return `${prefix}${Date.now().toString().slice(-4)}`;
+}
+
+function nextAccountCode(existing: string[], parent: string) {
+  const used = new Set(existing);
+  for (let i = 1; i < 100; i++) {
+    const code = `${parent}.${String(i).padStart(2, "0")}`;
+    if (!used.has(code)) return code;
+  }
+  return `${parent}.${Date.now().toString().slice(-3)}`;
+}
+
+/** Banco o caja extra para tesorería (cuenta 1.1.02.xx / 1.1.01.xx + diario). */
+export async function createLiquidityJournal(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const company = await getActiveCompany();
+  if (!company) return { error: "Crea una empresa primero." };
+
+  const name = String(formData.get("name") || "").trim();
+  const kind = String(formData.get("kind") || "bank") === "cash" ? "cash" : "bank";
+  const number = String(formData.get("account_number") || "").trim();
+  if (!name) return { error: "Indica el nombre del banco o la caja." };
+
+  const supabase = await createClient();
+  const seeded = await ensureCompanyAccounting();
+  if (seeded.error) return seeded;
+
+  const [{ data: journals }, { data: accounts }] = await Promise.all([
+    supabase
+      .from("account_journals")
+      .select("code")
+      .eq("company_id", company.id),
+    supabase
+      .from("account_accounts")
+      .select("code")
+      .eq("company_id", company.id),
+  ]);
+
+  const journalCode = nextCode(
+    (journals || []).map((j) => j.code),
+    kind === "cash" ? "CAJ" : "BAN",
+  );
+  const accountCode = nextAccountCode(
+    (accounts || []).map((a) => a.code),
+    kind === "cash" ? "1.1.01" : "1.1.02",
+  );
+  const label = number ? `${name} · ${number}` : name;
+
+  const { data: account, error: accErr } = await supabase
+    .from("account_accounts")
+    .insert({
+      company_id: company.id,
+      code: accountCode,
+      name: label,
+      account_type: "asset_cash",
+      reconcile: false,
+      active: true,
+    })
+    .select("id")
+    .single();
+  if (accErr) return { error: accErr.message };
+
+  const { error: jouErr } = await supabase.from("account_journals").insert({
+    company_id: company.id,
+    code: journalCode,
+    name: label,
+    journal_type: kind,
+    default_account_id: account.id,
+    active: true,
+  });
+  if (jouErr) {
+    await supabase.from("account_accounts").delete().eq("id", account.id);
+    if (/duplicate|unique|23505/i.test(jouErr.message)) {
+      return { error: "Ya existe un diario con ese código. Intenta de nuevo." };
+    }
+    return { error: jouErr.message };
+  }
+
+  revalidatePath("/app/treasury");
+  revalidatePath("/app/payments");
+  revalidatePath("/app/accounts");
+  return {
+    success: `${kind === "cash" ? "Caja" : "Banco"} ${journalCode} · ${label} (${accountCode}).`,
+  };
 }
 
 /** Create Odoo-like account.move for an invoice and set residual. */
@@ -370,25 +466,26 @@ export async function registerPayment(
   }
   await supabase.from("payment_allocations").insert(allocations);
 
-  // Simple payment move: bank/cash <-> receivable/payable
-  const liquidity =
-    accounts.property_account_receivable_id && paymentType === "inbound"
-      ? (
-          await supabase
-            .from("account_accounts")
-            .select("id")
-            .eq("company_id", company.id)
-            .eq("code", "1.1.02")
-            .maybeSingle()
-        ).data?.id
-      : (
-          await supabase
-            .from("account_accounts")
-            .select("id")
-            .eq("company_id", company.id)
-            .eq("code", "1.1.02")
-            .maybeSingle()
-        ).data?.id;
+  // Banco/caja del diario elegido (no siempre 1.1.02 genérico)
+  let liquidity: string | null = null;
+  if (journalId) {
+    const { data: journal } = await supabase
+      .from("account_journals")
+      .select("default_account_id")
+      .eq("id", journalId)
+      .eq("company_id", company.id)
+      .maybeSingle();
+    liquidity = journal?.default_account_id || null;
+  }
+  if (!liquidity) {
+    const { data: fallback } = await supabase
+      .from("account_accounts")
+      .select("id")
+      .eq("company_id", company.id)
+      .eq("code", "1.1.02")
+      .maybeSingle();
+    liquidity = fallback?.id || null;
+  }
 
   const partnerAccount =
     paymentType === "inbound"

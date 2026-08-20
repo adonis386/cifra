@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  LiquidityJournalForm,
   ReconcileLineForm,
   StatementCreateForm,
   StatementLineForm,
@@ -134,10 +135,17 @@ export default async function TreasuryPage() {
         {!journals?.length && (
           <EmptyState
             title="Sin caja/banco"
-            description="Regenera el plan VE en Libro → Plan."
+            description="Agrega un banco abajo o regenera el plan VE en Libro → Plan."
           />
         )}
       </div>
+
+      <SectionCard
+        title="Agregar banco o caja"
+        description="Banesco, Mercantil, caja chica… cada uno con su saldo y extracto."
+      >
+        <LiquidityJournalForm />
+      </SectionCard>
 
       <SectionCard
         title="Nuevo extracto"

@@ -7,12 +7,62 @@ import {
   reconcileStatementLine,
   type ActionState,
 } from "@/lib/actions/entries";
+import { createLiquidityJournal } from "@/lib/actions/accounting";
 import { Button, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
 
 const initial: ActionState = {};
 
 type Journal = { id: string; code: string; name: string; journal_type: string };
+
+export function LiquidityJournalForm() {
+  const [state, action, pending] = useActionState(createLiquidityJournal, initial);
+
+  return (
+    <form action={action} className="grid gap-3 md:grid-cols-4">
+      <div>
+        <Label htmlFor="kind">Tipo</Label>
+        <Select id="kind" name="kind" defaultValue="bank">
+          <option value="bank">Banco</option>
+          <option value="cash">Caja</option>
+        </Select>
+      </div>
+      <div>
+        <Label htmlFor="bank_name">Nombre</Label>
+        <Input
+          id="bank_name"
+          name="name"
+          required
+          placeholder="Banesco, Mercantil, Caja chica…"
+        />
+      </div>
+      <div>
+        <Label htmlFor="account_number">Nº de cuenta (opcional)</Label>
+        <Input
+          id="account_number"
+          name="account_number"
+          placeholder="0134-…"
+          className="font-mono"
+        />
+      </div>
+      <div className="flex items-end">
+        <Button type="submit" disabled={pending} className="w-full">
+          {pending ? "Guardando…" : "Agregar"}
+        </Button>
+      </div>
+      <div className="md:col-span-4">
+        <FieldError message={state.error} />
+        {state.success ? (
+          <p className="text-sm text-[var(--color-accent)]">{state.success}</p>
+        ) : (
+          <p className="text-xs text-[var(--color-muted-foreground)]">
+            Crea la cuenta en el plan y el diario para extractos y cobros/pagos.
+          </p>
+        )}
+      </div>
+    </form>
+  );
+}
 
 export type PaymentOption = {
   id: string;
