@@ -465,7 +465,7 @@ export function InvoiceForm({
         <span>
           <span className="block text-sm font-medium">Excluir del libro fiscal</span>
           <span className="text-xs text-[var(--color-muted-foreground)]">
-            Equivalente a <code>sin_cred</code> en Odoo: no entra en libro de compras/ventas.
+            Equivalente a sin crédito fiscal: no entra en el libro de compras/ventas.
           </span>
         </span>
       </label>
@@ -795,10 +795,9 @@ export function InvoiceForm({
         {pending ? "Guardando…" : "Registrar factura"}
       </Button>
       <p className="text-xs text-[var(--color-muted-foreground)]">
-        No se permiten números de factura repetidos para el mismo tercero. En
-        ISLR elige el concepto: honorarios profesionales/médicos usan 3% más
-        sustraendo (cuando aplique). La tabla completa se carga cuando la
-        envíen.
+        No se permiten números de factura repetidos para el mismo tercero
+        (146 y 000146 son el mismo). El ISLR se calcula con la tabla SENIAT
+        (honorarios: 3% menos sustraendo cuando aplique).
       </p>
     </form>
   );

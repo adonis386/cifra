@@ -66,7 +66,7 @@ export default async function PaymentsPage() {
       <PageHeader
         eyebrow="Contabilidad"
         title="Pagos y cobros"
-        description="Registro de account.payment con aplicación a facturas abiertas (FIFO o factura específica)."
+        description="Aplica el cobro o el pago a facturas abiertas (FIFO o una factura)."
         actions={<ReportExportActions xlsxHref="/api/export/payments" />}
       />
       <SectionCard title="Registrar" description="Inbound = cobro clientes · Outbound = pago proveedores.">

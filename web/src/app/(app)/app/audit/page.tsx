@@ -36,7 +36,7 @@ export default async function AuditPage() {
       <PageHeader
         eyebrow="Libro"
         title="Auditoría"
-        description="Bitácora de cambios: quién hizo qué sobre asientos, extractos y documentos. Reporte de control interno, no el menú técnico de Odoo."
+        description="Quién cambió asientos, extractos y documentos."
       />
 
       <SectionCard title="Actividad reciente">

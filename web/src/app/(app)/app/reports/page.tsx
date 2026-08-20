@@ -175,7 +175,7 @@ export default async function ReportsPage({
       <PageHeader
         eyebrow="Libro"
         title="Reportes"
-        description="Centro de lectura Cifra: cobranzas, mayor, estados de cuenta y control. No replica el menú Reportes de Odoo."
+        description="Cobranzas, mayor, estados de cuenta y control del mes."
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

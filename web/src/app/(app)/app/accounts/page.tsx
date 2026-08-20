@@ -112,7 +112,7 @@ export default async function AccountsPage() {
           ) : (
             <EmptyState
               title="Sin plan de cuentas"
-              description="Ejecuta la migración 07 o pulsa Regenerar plan VE."
+              description="Pulsa Regenerar plan VE."
             />
           )}
         </SectionCard>

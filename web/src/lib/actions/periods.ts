@@ -93,7 +93,7 @@ export async function closeAccountingPeriod(
       if (/accounting_periods|schema cache|relation/i.test(error.message)) {
         return {
           error:
-            "Aplica la migración cifra_libro (períodos) en Supabase para usar el cierre.",
+            "El cierre de período no está disponible. Revisa la conexión a la base.",
         };
       }
       return { error: error.message };

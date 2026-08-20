@@ -82,18 +82,30 @@ export default async function ConfigPage() {
       <PageHeader
         eyebrow="Sistema"
         title="Configuración"
-        description="Membrete PDF, correlativos de comprobantes, tasa USD/Bs, UT y catálogo ISLR."
+        description="Membrete PDF, correlativos, tasa BCV, UT, cierre de mes y catálogo de líneas."
       />
 
       <SectionCard
         title="Empresa y membrete"
-        description="Nombre, correo, logo (Supabase Storage bucket logos/{empresa}/logo.ext) y pie en facturas y reportes PDF."
+        description="Nombre, correo, logo y pie en facturas y reportes PDF."
       >
         {branding ? (
           <BrandingForm company={branding} />
         ) : (
           <EmptyState title="Sin datos de empresa" />
         )}
+      </SectionCard>
+
+      <SectionCard
+        title="Catálogo de líneas"
+        description="Nombres y precios para cargar facturas más rápido. No es inventario ni stock."
+      >
+        <Link
+          href="/app/products"
+          className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+        >
+          Abrir catálogo
+        </Link>
       </SectionCard>
 
       <SectionCard
@@ -150,7 +162,7 @@ export default async function ConfigPage() {
           ) : (
             <EmptyState
               title="Sin tasas"
-              description="Aplica la migración 08 y registra la tasa del día."
+              description="Registra la tasa del día (BCV) arriba."
             />
           )}
         </SectionCard>
@@ -182,7 +194,7 @@ export default async function ConfigPage() {
           ) : (
             <EmptyState
               title="Sin UT"
-              description="Ejecuta la migración 04 o crea una UT."
+              description="Crea una unidad tributaria si no aparece."
             />
           )}
         </SectionCard>

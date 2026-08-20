@@ -40,19 +40,23 @@ export default async function ProductsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Maestros"
-        title="Productos"
-        description="Catálogo con precios para cargar líneas de factura más rápido."
+        eyebrow="Configuración"
+        title="Catálogo de líneas"
+        description="Nombres y precios para cargar facturas. No hay stock ni inventario."
+        actions={
+          <Link
+            href="/app/config"
+            className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-sm font-semibold"
+          >
+            Volver a configuración
+          </Link>
+        }
       />
 
       <SectionCard title="Nuevo producto">
         {error && /relation|does not exist|schema/i.test(error.message) ? (
           <p className="text-sm text-[var(--color-destructive)]">
-            Ejecuta en Supabase la migración{" "}
-            <code className="font-mono text-xs">
-              20260818000014_products_registration_sequences.sql
-            </code>
-            .
+            El catálogo no está disponible en esta empresa.
           </p>
         ) : (
           <ProductForm />
@@ -99,7 +103,7 @@ export default async function ProductsPage() {
         ) : (
           <EmptyState
             title="Sin productos"
-            description="Crea el primero arriba (tras aplicar la migración SQL)."
+            description="Crea el primero arriba si quieres reutilizar descripciones."
           />
         )}
       </SectionCard>

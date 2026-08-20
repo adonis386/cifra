@@ -334,6 +334,20 @@ export async function createInvoice(
   if (lineErr) return { error: lineErr };
 
   await tryPostAccounting(invoice.id);
+  if (finalRetained > 0) {
+    try {
+      const { ensureIvaWithholdingForInvoice } = await import(
+        "@/lib/actions/withholdings"
+      );
+      await ensureIvaWithholdingForInvoice(
+        invoice.id,
+        effectiveWithholdingPct,
+        invoiceDate,
+      );
+    } catch {
+      /* comprobante IVA se puede generar en Retenciones */
+    }
+  }
   if (finalRetainedIslr > 0) {
     try {
       const { ensureIslrWithholdingForInvoice } = await import("@/lib/actions/islr");
@@ -413,6 +427,7 @@ async function tryPostAccounting(invoiceId: string) {
 
 function revalidateAll(invoiceId?: string) {
   revalidatePath("/app/invoices");
+  revalidatePath("/app/invoices/new");
   if (invoiceId) revalidatePath(`/app/invoices/${invoiceId}`);
   revalidatePath("/app/receivables");
   revalidatePath("/app/payables");

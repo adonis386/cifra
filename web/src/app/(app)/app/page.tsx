@@ -160,7 +160,7 @@ export default async function AppHomePage() {
             {company!.name}
           </h1>
         </div>
-        <Link href="/app/invoices" className="shrink-0">
+        <Link href="/app/invoices/new" className="shrink-0">
           <Button type="button" className="px-[18px] py-3">
             Nueva factura
           </Button>

@@ -1,13 +1,10 @@
 import Link from "next/link";
-import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { CancelInvoiceButton } from "@/components/invoices/cancel-invoice-button";
 import { ReportExportActions } from "@/components/report-export-actions";
 import {
   formatDual,
   formatMoney,
   getActiveCompany,
-  getExchangeRate,
-  getActiveTaxUnit,
 } from "@/lib/company";
 import { sameInvoiceNumber } from "@/lib/invoice-number";
 import { createClient } from "@/lib/supabase/server";
@@ -85,7 +82,6 @@ export default async function InvoicesPage({
   }
 
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
   const saleTypes = ["out_invoice", "out_refund"];
   const purchaseTypes = ["in_invoice", "in_refund"];
   let invoiceQuery = supabase
@@ -109,42 +105,14 @@ export default async function InvoicesPage({
     invoiceQuery = invoiceQuery.eq("payment_state", estado);
   }
 
-  const [
-    { data: partners },
-    { data: invoicesRaw },
-    { data: concepts },
-    { data: islrRates },
-    taxUnitAmount,
-    productsRes,
-    rate,
-  ] = await Promise.all([
+  const [{ data: partners }, { data: invoicesRaw }] = await Promise.all([
       supabase
         .from("partners")
         .select("id, name, rif, person_type")
         .eq("company_id", company.id)
         .order("name"),
       invoiceQuery,
-      supabase
-        .from("islr_concepts")
-        .select("id, code, name, withholdable, company_id")
-        .or(`company_id.eq.${company.id},company_id.is.null`)
-        .eq("active", true)
-        .order("code"),
-      supabase
-        .from("islr_rates")
-        .select("concept_id, person_type, rate, subtract_ut, base_percent, minimum_ut")
-        .eq("active", true),
-      getActiveTaxUnit(company.id, today),
-      supabase
-        .from("products")
-        .select("id, code, name, price_unit, tax_code")
-        .eq("company_id", company.id)
-        .eq("active", true)
-        .order("name"),
-      getExchangeRate(company.id, today),
     ]);
-
-  const products = productsRes.error ? [] : productsRes.data;
   const invoices = q
     ? (invoicesRaw || []).filter((inv) => {
         const num = String(inv.invoice_number || "");
@@ -156,23 +124,6 @@ export default async function InvoicesPage({
         );
       })
     : invoicesRaw || [];
-
-  const companyScoped = (concepts || []).filter((c) => c.company_id === company.id);
-  const pool = companyScoped.length ? companyScoped : concepts || [];
-  const seen = new Set<string>();
-  const islrConcepts = pool.filter((c) => {
-    if (seen.has(c.code)) return false;
-    seen.add(c.code);
-    return true;
-  });
-
-  const productList = (products || []).map((p) => ({
-    id: p.id,
-    code: p.code || "",
-    name: p.name,
-    price_unit: Number(p.price_unit || 0),
-    tax_code: p.tax_code || "IVA16",
-  }));
 
   const exportQs = new URLSearchParams();
   if (tipo !== "todas") exportQs.set("tipo", tipo);
@@ -188,32 +139,19 @@ export default async function InvoicesPage({
       <PageHeader
         eyebrow="Documentos"
         title="Facturas"
-        description="Compras y ventas con control fiscal, multi-alícuota, dual $ / Bs y retenciones."
-        actions={<ReportExportActions xlsxHref={exportHref} />}
+        description="Compras y ventas con control, IVA, ISLR y saldo."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/app/invoices/new"
+              className="rounded-[var(--radius-md)] bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white"
+            >
+              Nueva factura
+            </Link>
+            <ReportExportActions xlsxHref={exportHref} />
+          </div>
+        }
       />
-
-      <SectionCard
-        title="Registrar documento"
-        description="Líneas con cantidad × precio, alícuota IVA, concepto ISLR y tasa del día."
-      >
-        <InvoiceForm
-          partners={partners || []}
-          islrConcepts={islrConcepts}
-          islrRates={(islrRates || []).map((r) => ({
-            concept_id: r.concept_id,
-            person_type: r.person_type,
-            rate: Number(r.rate || 0),
-            subtract_ut: Number(r.subtract_ut || 0),
-            base_percent: Number(r.base_percent || 100),
-            minimum_ut: Number(
-              (r as { minimum_ut?: number }).minimum_ut || 0,
-            ),
-          }))}
-          products={productList}
-          initialRate={rate || 0}
-          taxUnitAmount={taxUnitAmount}
-        />
-      </SectionCard>
 
       <SectionCard title="Documentos">
         <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Filtrar facturas">
@@ -408,7 +346,7 @@ export default async function InvoicesPage({
             </tbody>
           </DataTable>
         ) : (
-          <EmptyState title="Sin facturas" description="Ajusta los filtros o registra un documento arriba." />
+          <EmptyState title="Sin facturas" description="Registra un documento con Nueva factura." />
         )}
       </SectionCard>
     </div>

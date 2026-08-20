@@ -31,13 +31,14 @@ export default async function WithholdingsPage() {
     { data: invoices },
     { data: withholdings },
     { data: islrDocs },
-    { data: concepts },
-    { data: rates },
+    { data: ivaLinked },
+    { data: islrLinked },
   ] = await Promise.all([
     supabase
       .from("invoices")
-      .select("id, invoice_number, invoice_date, amount_retained_iva, amount_untaxed, partners(name, rif)")
+      .select("id, invoice_number, invoice_date, amount_retained_iva, amount_retained_islr, amount_untaxed, amount_tax, partners(name, rif)")
       .eq("company_id", company.id)
+      .neq("state", "cancelled")
       .order("invoice_date", { ascending: false }),
     supabase
       .from("withholding_iva")
@@ -49,65 +50,85 @@ export default async function WithholdingsPage() {
       .from("withholding_islr")
       .select("id, voucher_number, period, voucher_date, amount_withheld, state, partners(name, rif)")
       .eq("company_id", company.id)
+      .neq("state", "cancelled")
       .order("voucher_date", { ascending: false }),
     supabase
-      .from("islr_concepts")
-      .select("id, code, name, company_id")
-      .or(`company_id.eq.${company.id},company_id.is.null`)
-      .order("code"),
+      .from("withholding_iva_lines")
+      .select("invoice_id, withholding_iva(state)")
+      .eq("company_id", company.id),
     supabase
-      .from("islr_rates")
-      .select("id, concept_id, person_type, rate, subtract_ut, minimum_ut, code")
-      .eq("active", true),
+      .from("withholding_islr_lines")
+      .select("invoice_id, withholding_islr(state)")
+      .eq("company_id", company.id),
   ]);
 
-  const owned = (concepts || []).filter((c) => c.company_id === company.id);
-  const pool = owned.length ? owned : concepts || [];
-  const companyConcepts = pool
-    .filter((c) => c.code !== "000")
-    .map(({ id, code, name }) => ({ id, code, name }));
-  const conceptIds = new Set(companyConcepts.map((c) => c.id));
-  const filteredRates = (rates || [])
-    .filter((r) => conceptIds.has(r.concept_id))
-    .map((r) => ({
-      id: r.id,
-      concept_id: r.concept_id,
-      person_type: r.person_type,
-      rate: Number(r.rate || 0),
-      subtract_ut: Number(r.subtract_ut || 0),
-      minimum_ut: Number((r as { minimum_ut?: number }).minimum_ut || 0),
-      code: r.code || null,
-    }));
+  const ivaDone = new Set(
+    (ivaLinked || [])
+      .filter((row) => {
+        const parent = row.withholding_iva as unknown as
+          | { state?: string }
+          | { state?: string }[]
+          | null;
+        const st = Array.isArray(parent) ? parent[0]?.state : parent?.state;
+        return st !== "cancelled";
+      })
+      .map((row) => row.invoice_id),
+  );
+  const islrDone = new Set(
+    (islrLinked || [])
+      .filter((row) => {
+        const parent = row.withholding_islr as unknown as
+          | { state?: string }
+          | { state?: string }[]
+          | null;
+        const st = Array.isArray(parent) ? parent[0]?.state : parent?.state;
+        return st !== "cancelled";
+      })
+      .map((row) => row.invoice_id),
+  );
 
-  const invoiceOptions = (invoices || []).map((inv) => {
-    const partner = inv.partners as unknown as
+  function optionLabel(inv: {
+    invoice_date: string;
+    invoice_number: string;
+    amount_untaxed: number;
+    amount_retained_iva?: number;
+    amount_retained_islr?: number;
+    partners: unknown;
+  }) {
+    const partner = inv.partners as
       | { name: string; rif: string }
       | { name: string; rif: string }[]
       | null;
     const p = Array.isArray(partner) ? partner[0] : partner;
-    const retIslr = Number(
-      (inv as { amount_retained_islr?: number }).amount_retained_islr || 0,
-    );
-    return {
-      id: inv.id,
-      label: `${inv.invoice_date} · ${inv.invoice_number} · ${p?.name || ""} · Base ${formatMoney(inv.amount_untaxed)} · RetIVA ${formatMoney(inv.amount_retained_iva)}${retIslr > 0 ? ` · RetISLR ${formatMoney(retIslr)}` : ""}`,
-    };
-  });
+    const retIva = Number(inv.amount_retained_iva || 0);
+    const retIslr = Number(inv.amount_retained_islr || 0);
+    return `${inv.invoice_date} · ${inv.invoice_number} · ${p?.name || ""} · Base ${formatMoney(inv.amount_untaxed)}${retIva > 0 ? ` · IVA ${formatMoney(retIva)}` : ""}${retIslr > 0 ? ` · ISLR ${formatMoney(retIslr)}` : ""}`;
+  }
+
+  const ivaInvoices = (invoices || [])
+    .filter((inv) => Number(inv.amount_retained_iva || 0) > 0 && !ivaDone.has(inv.id))
+    .map((inv) => ({ id: inv.id, label: optionLabel(inv) }));
+  const islrInvoices = (invoices || [])
+    .filter((inv) => Number(inv.amount_retained_islr || 0) > 0 && !islrDone.has(inv.id))
+    .map((inv) => ({ id: inv.id, label: optionLabel(inv) }));
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="SENIAT"
         title="Retenciones"
-        description="IVA (TXT 99035) e ISLR (XML RelacionRetencionesISLR), con lógica de l10n_ve_full."
+        description="Comprobantes IVA (TXT 99035) e ISLR (XML). El cálculo sale de la factura, no se elige tarifa a mano."
       />
 
-      <SectionCard title="Operaciones" description="Crea comprobantes y exporta archivos oficiales.">
-        <WithholdingHub
-          invoices={invoiceOptions}
-          concepts={companyConcepts}
-          rates={filteredRates}
-        />
+      <SectionCard
+        title="Pendientes y exportación"
+        description={
+          ivaInvoices.length || islrInvoices.length
+            ? `${ivaInvoices.length} IVA y ${islrInvoices.length} ISLR sin comprobante.`
+            : "No hay facturas con retención pendiente de comprobante."
+        }
+      >
+        <WithholdingHub ivaInvoices={ivaInvoices} islrInvoices={islrInvoices} />
       </SectionCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -218,7 +239,7 @@ export default async function WithholdingsPage() {
               </tbody>
             </DataTable>
           ) : (
-            <EmptyState title="Sin comprobantes ISLR" description="Clona el catálogo en Configuración si falta." />
+            <EmptyState title="Sin comprobantes ISLR" />
           )}
         </SectionCard>
       </div>

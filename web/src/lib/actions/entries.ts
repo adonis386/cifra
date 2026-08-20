@@ -181,7 +181,7 @@ export async function createBankStatement(
     if (/bank_statements|schema cache|column/i.test(error.message)) {
       return {
         error:
-          "Aplica la migración 09 (cifra_libro) en Supabase para usar extractos.",
+          "Los extractos no están disponibles. Revisa la conexión a la base.",
       };
     }
     return { error: error.message };

@@ -157,6 +157,18 @@ export async function createIvaWithholding(
   return { success: `Comprobante ${voucherNumber} creado.` };
 }
 
+export async function ensureIvaWithholdingForInvoice(
+  invoiceId: string,
+  pct: number,
+  voucherDate: string,
+) {
+  const fd = new FormData();
+  fd.set("invoice_id", invoiceId);
+  fd.set("voucher_date", voucherDate);
+  fd.set("withholding_pct", String(pct || 75));
+  await createIvaWithholding({}, fd);
+}
+
 export async function cancelIvaWithholding(
   formData: FormData,
 ): Promise<void> {

@@ -50,9 +50,9 @@ export default async function BooksPage({
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="SENIAT · Art. 75"
+        eyebrow="Cumplir"
         title="Libros fiscales"
-        description="Libro de compras (Art. 75) y ventas (Art. 76) del Reglamento de IVA."
+        description="Libro de compras (Art. 75) y de ventas (Art. 76) del Reglamento de IVA."
       />
 
       <SectionCard title="Generar período">

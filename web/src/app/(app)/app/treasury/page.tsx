@@ -100,7 +100,7 @@ export default async function TreasuryPage() {
       <PageHeader
         eyebrow="Libro"
         title="Caja y bancos"
-        description="Tesorería Cifra: saldos reales + extractos para conciliar. No es el tablero de diarios de Odoo."
+        description="Saldos de caja y banco, extractos y conciliación con cobros y pagos."
         actions={
           <Link
             href="/app/payments"
@@ -145,9 +145,7 @@ export default async function TreasuryPage() {
       >
         {migrationNeeded ? (
           <p className="text-sm text-[var(--color-destructive)]">
-            Aplica la migración{" "}
-            <code>20260812000009_cifra_libro.sql</code> en Supabase para activar
-            extractos.
+            Los extractos no están disponibles. Revisa la conexión a la base.
           </p>
         ) : (
           <StatementCreateForm journals={journals || []} initialRate={rate || 0} />
@@ -250,7 +248,7 @@ export default async function TreasuryPage() {
             title="Sin extractos"
             description={
               migrationNeeded
-                ? "Falta la migración 09."
+                ? "No hay extractos en esta empresa."
                 : "Crea el primer extracto arriba."
             }
           />

@@ -67,7 +67,7 @@ export default async function ReceivablesPage() {
       <PageHeader
         eyebrow="Contabilidad"
         title="Cuentas por cobrar"
-        description="Saldos de clientes y antigüedad estilo Odoo, con dual $ / Bs."
+        description="Facturas de clientes con saldo, por antigüedad, en Bs y USD."
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <ReportExportActions

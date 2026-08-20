@@ -19,11 +19,13 @@ type Rate = {
 };
 
 export function WithholdingHub({
-  invoices,
+  ivaInvoices,
+  islrInvoices,
 }: {
-  invoices: InvoiceOption[];
-  concepts: Concept[];
-  rates: Rate[];
+  ivaInvoices: InvoiceOption[];
+  islrInvoices: InvoiceOption[];
+  concepts?: Concept[];
+  rates?: Rate[];
 }) {
   const [tab, setTab] = useState<"iva" | "islr">("iva");
   const [ivaState, ivaAction, ivaPending] = useActionState(createIvaWithholding, {});
@@ -70,12 +72,16 @@ export function WithholdingHub({
             <h3 className="font-semibold">Comprobante IVA</h3>
             <div>
               <Label htmlFor="invoice_id">Factura con retención</Label>
-              <Select id="invoice_id" name="invoice_id" required disabled={!invoices.length}>
-                {invoices.map((inv) => (
-                  <option key={inv.id} value={inv.id}>
-                    {inv.label}
-                  </option>
-                ))}
+              <Select id="invoice_id" name="invoice_id" required disabled={!ivaInvoices.length}>
+                {ivaInvoices.length ? (
+                  ivaInvoices.map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.label}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Sin facturas pendientes de IVA</option>
+                )}
               </Select>
             </div>
             <div>
@@ -99,7 +105,7 @@ export function WithholdingHub({
             </div>
             <FieldError message={ivaState.error} />
             {ivaState.success && <p className="text-sm text-[var(--color-accent)]">{ivaState.success}</p>}
-            <Button type="submit" disabled={ivaPending || !invoices.length}>
+            <Button type="submit" disabled={ivaPending || !ivaInvoices.length}>
               {ivaPending ? "Guardando…" : "Crear comprobante IVA"}
             </Button>
           </form>
@@ -139,12 +145,16 @@ export function WithholdingHub({
             </p>
             <div>
               <Label htmlFor="islr_invoice">Factura</Label>
-              <Select id="islr_invoice" name="invoice_id" required>
-                {invoices.map((inv) => (
-                  <option key={inv.id} value={inv.id}>
-                    {inv.label}
-                  </option>
-                ))}
+              <Select id="islr_invoice" name="invoice_id" required disabled={!islrInvoices.length}>
+                {islrInvoices.length ? (
+                  islrInvoices.map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.label}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Sin facturas pendientes de ISLR</option>
+                )}
               </Select>
             </div>
             <div>
@@ -153,7 +163,7 @@ export function WithholdingHub({
             </div>
             <FieldError message={islrState.error} />
             {islrState.success && <p className="text-sm text-[var(--color-accent)]">{islrState.success}</p>}
-            <Button type="submit" disabled={islrPending}>
+            <Button type="submit" disabled={islrPending || !islrInvoices.length}>
               {islrPending ? "Guardando…" : "Crear / actualizar comprobante ISLR"}
             </Button>
           </form>
