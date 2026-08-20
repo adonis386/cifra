@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/actions/audit";
+import { assertPeriodOpen } from "@/lib/actions/periods";
 
 export type ActionState = { error?: string; success?: string };
 
@@ -46,6 +47,8 @@ export async function createManualEntry(
   }
 
   if (!moveDate) return { error: "Indica la fecha del asiento." };
+  const periodOk = await assertPeriodOpen(company.id, moveDate);
+  if (!periodOk.ok) return { error: periodOk.error };
   if (lines.length < 2) return { error: "Un asiento necesita al menos 2 líneas." };
 
   const normalized = lines.map((l) => ({
@@ -211,23 +214,141 @@ export async function addBankStatementLine(
   const paymentRef = String(formData.get("payment_ref") || "").trim();
   const partnerName = String(formData.get("partner_name") || "").trim();
   const notes = String(formData.get("notes") || "").trim();
+  const paymentId = String(formData.get("payment_id") || "").trim() || null;
 
-  if (!statementId || !lineDate || !amount) {
-    return { error: "Fecha y monto son obligatorios." };
+  if (!statementId || !lineDate) {
+    return { error: "Fecha es obligatoria." };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("bank_statement_lines").insert({
+
+  let amountFinal = amount;
+  let refFinal = paymentRef;
+  let partnerFinal = partnerName;
+  let reconciled = false;
+  let partnerId: string | null = null;
+  let moveLineId: string | null = null;
+
+  if (paymentId) {
+    const { data: pay } = await supabase
+      .from("payments")
+      .select("id, amount, payment_type, reference, memo, partner_id, move_id, partners(name)")
+      .eq("id", paymentId)
+      .eq("company_id", company.id)
+      .maybeSingle();
+    if (!pay) return { error: "Pago no encontrado." };
+    const signed =
+      pay.payment_type === "outbound"
+        ? -Math.abs(Number(pay.amount))
+        : Math.abs(Number(pay.amount));
+    if (!amountFinal) amountFinal = signed;
+    refFinal = refFinal || String(pay.reference || pay.memo || "");
+    const p = pay.partners as unknown as { name?: string } | { name?: string }[] | null;
+    partnerFinal =
+      partnerFinal ||
+      (Array.isArray(p) ? p[0]?.name : p?.name) ||
+      "";
+    partnerId = pay.partner_id;
+    reconciled = true;
+    if (pay.move_id) {
+      const { data: ml } = await supabase
+        .from("account_move_lines")
+        .select("id")
+        .eq("move_id", pay.move_id)
+        .limit(1)
+        .maybeSingle();
+      moveLineId = ml?.id || null;
+    }
+  }
+
+  if (!amountFinal) return { error: "Fecha y monto son obligatorios." };
+
+  const payload: Record<string, unknown> = {
     statement_id: statementId,
     company_id: company.id,
     line_date: lineDate,
-    amount,
-    payment_ref: paymentRef || null,
-    partner_name: partnerName || null,
+    amount: amountFinal,
+    payment_ref: refFinal || null,
+    partner_name: partnerFinal || null,
     notes: notes || null,
-  });
+    is_reconciled: reconciled,
+    partner_id: partnerId,
+    move_line_id: moveLineId,
+    payment_id: paymentId,
+  };
 
-  if (error) return { error: error.message };
+  const { error } = await supabase.from("bank_statement_lines").insert(payload);
+  if (error && /payment_id|column|schema/i.test(error.message)) {
+    delete payload.payment_id;
+    const retry = await supabase.from("bank_statement_lines").insert(payload);
+    if (retry.error) return { error: retry.error.message };
+  } else if (error) {
+    return { error: error.message };
+  }
   revalidatePath("/app/treasury");
-  return { success: "Línea de extracto agregada." };
+  return {
+    success: reconciled
+      ? "Línea agregada y conciliada con el pago."
+      : "Línea de extracto agregada.",
+  };
+}
+
+export async function reconcileStatementLine(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const company = await getActiveCompany();
+  if (!company) return { error: "Sin empresa." };
+  const lineId = String(formData.get("line_id") || "");
+  const paymentId = String(formData.get("payment_id") || "").trim();
+  if (!lineId || !paymentId) return { error: "Elige un pago para conciliar." };
+
+  const supabase = await createClient();
+  const { data: pay } = await supabase
+    .from("payments")
+    .select("id, reference, memo, partner_id, move_id, partners(name)")
+    .eq("id", paymentId)
+    .eq("company_id", company.id)
+    .maybeSingle();
+  if (!pay) return { error: "Pago no encontrado." };
+
+  const p = pay.partners as unknown as { name?: string } | { name?: string }[] | null;
+  const partnerName = Array.isArray(p) ? p[0]?.name : p?.name;
+  let moveLineId: string | null = null;
+  if (pay.move_id) {
+    const { data: ml } = await supabase
+      .from("account_move_lines")
+      .select("id")
+      .eq("move_id", pay.move_id)
+      .limit(1)
+      .maybeSingle();
+    moveLineId = ml?.id || null;
+  }
+
+  const patch: Record<string, unknown> = {
+    is_reconciled: true,
+    payment_id: paymentId,
+    partner_id: pay.partner_id,
+    partner_name: partnerName || null,
+    payment_ref: pay.reference || pay.memo || null,
+    move_line_id: moveLineId,
+  };
+  const { error } = await supabase
+    .from("bank_statement_lines")
+    .update(patch)
+    .eq("id", lineId)
+    .eq("company_id", company.id);
+  if (error && /payment_id|column/i.test(error.message)) {
+    delete patch.payment_id;
+    const retry = await supabase
+      .from("bank_statement_lines")
+      .update(patch)
+      .eq("id", lineId)
+      .eq("company_id", company.id);
+    if (retry.error) return { error: retry.error.message };
+  } else if (error) {
+    return { error: error.message };
+  }
+  revalidatePath("/app/treasury");
+  return { success: "Línea conciliada." };
 }

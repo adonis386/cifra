@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  ReconcileLineForm,
   StatementCreateForm,
   StatementLineForm,
 } from "@/components/treasury/statement-forms";
@@ -36,7 +37,7 @@ export default async function TreasuryPage() {
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ data: journals }, { data: moveLines }, rate, statementsRes] =
+  const [{ data: journals }, { data: moveLines }, rate, statementsRes, paymentsRes] =
     await Promise.all([
       supabase
         .from("account_journals")
@@ -57,6 +58,12 @@ export default async function TreasuryPage() {
         .eq("company_id", company.id)
         .order("statement_date", { ascending: false })
         .limit(20),
+      supabase
+        .from("payments")
+        .select("id, payment_date, amount, payment_type, reference, partners(name)")
+        .eq("company_id", company.id)
+        .order("payment_date", { ascending: false })
+        .limit(80),
     ]);
 
   const statements = statementsRes.error ? [] : statementsRes.data || [];
@@ -64,6 +71,21 @@ export default async function TreasuryPage() {
     statementsRes.error &&
       /bank_statements|schema cache|relation/i.test(statementsRes.error.message),
   );
+  const payments = (paymentsRes.data || []).map((p) => {
+    const partner = p.partners as unknown as
+      | { name: string }
+      | { name: string }[]
+      | null;
+    const name = Array.isArray(partner) ? partner[0]?.name : partner?.name;
+    return {
+      id: p.id,
+      payment_date: p.payment_date,
+      amount: Number(p.amount || 0),
+      payment_type: p.payment_type,
+      reference: p.reference,
+      partner_name: name || "—",
+    };
+  });
 
   const bal = new Map<string, number>();
   for (const l of moveLines || []) {
@@ -199,7 +221,13 @@ export default async function TreasuryPage() {
                             <Td className="text-right font-mono text-xs">
                               {formatMoney(l.amount)}
                             </Td>
-                            <Td>{l.is_reconciled ? "Sí" : "No"}</Td>
+                            <Td>
+                              {l.is_reconciled ? (
+                                "Sí"
+                              ) : (
+                                <ReconcileLineForm lineId={l.id} payments={payments} />
+                              )}
+                            </Td>
                           </tr>
                         ))}
                       </tbody>
@@ -211,7 +239,7 @@ export default async function TreasuryPage() {
                   )}
 
                   <div className="mt-4">
-                    <StatementLineForm statementId={st.id} />
+                    <StatementLineForm statementId={st.id} payments={payments} />
                   </div>
                 </div>
               );

@@ -22,6 +22,8 @@ type BookInvoice = {
   amount_exempt: number;
   amount_total: number;
   amount_retained_iva: number;
+  amount_igtf?: number;
+  igtf_rate?: number;
   sin_cred?: boolean;
   partners:
     | { name: string; rif: string; person_type?: string }
@@ -151,6 +153,24 @@ export async function generateFiscalBook(
   let invErr: { message: string } | null = null;
 
   {
+    const res = await supabase
+      .from("invoices")
+      .select(
+        "id, invoice_date, registration_date, invoice_number, control_number, doc_type, move_type, affected_document, import_planilla, import_file_number, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva, amount_igtf, igtf_rate, sin_cred, partners(name, rif, person_type)",
+      )
+      .eq("company_id", company.id)
+      .in("move_type", moveTypes)
+      .gte("registration_date", periodStart)
+      .lte("registration_date", periodEnd)
+      .neq("state", "cancelled")
+      .eq("sin_cred", false)
+      .order("registration_date", { ascending: true })
+      .order("invoice_date", { ascending: true });
+    invoices = res.data as BookInvoice[] | null;
+    invErr = res.error;
+  }
+
+  if (invErr && /igtf|column|schema/i.test(invErr.message)) {
     const res = await supabase
       .from("invoices")
       .select(
@@ -395,8 +415,8 @@ export async function generateFiscalBook(
       tax_natural_reduced,
       base_natural_additional,
       tax_natural_additional,
-      igtf_amount: 0,
-      igtf_rate: 0,
+      igtf_amount: Number(inv.amount_igtf || 0),
+      igtf_rate: Number(inv.igtf_rate || 0),
       voucher_number: voucher?.voucher_number || null,
       voucher_date: voucher?.voucher_date || null,
     };

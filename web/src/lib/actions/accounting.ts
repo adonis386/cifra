@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+import { assertPeriodOpen } from "@/lib/actions/periods";
 
 export type ActionState = { error?: string; success?: string };
 
@@ -248,6 +249,9 @@ export async function registerPayment(
     return { error: "Completa tercero, fecha y monto." };
   }
 
+  const periodOk = await assertPeriodOpen(company.id, paymentDate);
+  if (!periodOk.ok) return { error: periodOk.error };
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -469,4 +473,151 @@ export async function registerPayment(
       remaining > 0 ? ` · sobrante ${remaining.toFixed(2)}` : ""
     }`,
   };
+}
+
+async function accountIdByCode(companyId: string, code: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("account_accounts")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("code", code)
+    .maybeSingle();
+  return data?.id || null;
+}
+
+/** Asiento de retención: compra Dr CxP / Cr ret. por pagar. Venta IVA Dr débito / Cr CxC. */
+export async function postWithholdingAccounting(input: {
+  invoiceId: string;
+  kind: "iva" | "islr";
+  amount: number;
+  date: string;
+  voucherNumber: string;
+}): Promise<ActionState> {
+  const amount = Number(input.amount || 0);
+  if (amount <= 0.009) return { success: "Sin monto a contabilizar." };
+
+  const company = await getActiveCompany();
+  if (!company) return { error: "Sin empresa." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: inv } = await supabase
+    .from("invoices")
+    .select("id, move_type, partner_id, invoice_number")
+    .eq("id", input.invoiceId)
+    .eq("company_id", company.id)
+    .single();
+  if (!inv) return { error: "Factura no encontrada." };
+
+  const ref = `WH-${input.kind.toUpperCase()}-${input.voucherNumber}`;
+  const { data: existing } = await supabase
+    .from("account_moves")
+    .select("id")
+    .eq("company_id", company.id)
+    .eq("ref", ref)
+    .maybeSingle();
+  if (existing) return { success: "Asiento de retención ya existe." };
+
+  const props = await getCompanyAccounts(company.id);
+  const isSale = String(inv.move_type).startsWith("out_");
+  if (isSale && input.kind === "islr") {
+    return { success: "ISLR de venta no genera asiento." };
+  }
+
+  const partnerAccount = isSale
+    ? props?.property_account_receivable_id
+    : props?.property_account_payable_id;
+  const ivaDebito = props?.property_account_tax_sale_id;
+  const liability =
+    input.kind === "iva"
+      ? await accountIdByCode(company.id, "2.1.03")
+      : await accountIdByCode(company.id, "2.1.04");
+
+  if (!partnerAccount || (isSale && !ivaDebito) || (!isSale && !liability)) {
+    return { error: "Faltan cuentas de retención en el plan. Regenera el plan VE." };
+  }
+
+  const { data: journal } = await supabase
+    .from("account_journals")
+    .select("id")
+    .eq("company_id", company.id)
+    .eq("code", "MISC")
+    .maybeSingle();
+
+  const { data: move, error: moveErr } = await supabase
+    .from("account_moves")
+    .insert({
+      company_id: company.id,
+      journal_id: journal?.id || null,
+      name: ref,
+      ref,
+      move_date: input.date,
+      state: "confirmed",
+      partner_id: inv.partner_id,
+      invoice_id: inv.id,
+      notes: `Retención ${input.kind.toUpperCase()} ${input.voucherNumber}`,
+      created_by: user?.id,
+    })
+    .select("id")
+    .single();
+  if (moveErr) return { error: moveErr.message };
+
+  const label = input.kind === "iva" ? "Retención IVA" : "Retención ISLR";
+  const lines = isSale
+    ? [
+        {
+          move_id: move.id,
+          company_id: company.id,
+          account_id: ivaDebito!,
+          name: `${label} ${inv.invoice_number}`,
+          debit: amount,
+          credit: 0,
+          amount_residual: 0,
+          invoice_id: inv.id,
+        },
+        {
+          move_id: move.id,
+          company_id: company.id,
+          account_id: partnerAccount,
+          partner_id: inv.partner_id,
+          name: `${label} ${inv.invoice_number}`,
+          debit: 0,
+          credit: amount,
+          amount_residual: 0,
+          invoice_id: inv.id,
+        },
+      ]
+    : [
+        {
+          move_id: move.id,
+          company_id: company.id,
+          account_id: partnerAccount,
+          partner_id: inv.partner_id,
+          name: `${label} ${inv.invoice_number}`,
+          debit: amount,
+          credit: 0,
+          amount_residual: 0,
+          invoice_id: inv.id,
+        },
+        {
+          move_id: move.id,
+          company_id: company.id,
+          account_id: liability!,
+          name: `${label} ${input.voucherNumber}`,
+          debit: 0,
+          credit: amount,
+          amount_residual: 0,
+          invoice_id: inv.id,
+        },
+      ];
+
+  const { error: lineErr } = await supabase.from("account_move_lines").insert(lines);
+  if (lineErr) return { error: lineErr.message };
+
+  revalidatePath("/app/ledger");
+  revalidatePath("/app/entries");
+  return { success: `Asiento ${ref}` };
 }

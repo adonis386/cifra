@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
 import { Button } from "@/components/ui";
 import { PageHeader } from "@/components/layout";
+import { seniatMonthlyDue } from "@/lib/seniat/due-calendar";
 
 function greetingForHour(hour: number) {
   if (hour < 12) return "Buenos días";
@@ -46,11 +47,19 @@ export default async function AppHomePage() {
   const greeting = greetingForHour(new Date().getUTCHours() - 4);
   const supabase = await createClient();
 
+  const dues = seniatMonthlyDue(today);
+  const periodYm = dues[0]?.period || today.slice(0, 7);
+  const periodStart = `${periodYm}-01`;
+  const periodEnd = `${periodYm}-31`;
+
   const [
     rate,
     { data: openInvoices },
     { count: invoiceCount },
     { data: recentInvoices },
+    { data: booksForPeriod },
+    { count: ivaWhCount },
+    { count: islrWhCount },
   ] = await Promise.all([
     company ? getExchangeRate(company.id, today) : Promise.resolve(null),
     company
@@ -78,6 +87,30 @@ export default async function AppHomePage() {
           .order("invoice_date", { ascending: false })
           .limit(5)
       : Promise.resolve({ data: null }),
+    company
+      ? supabase
+          .from("fiscal_books")
+          .select("id, book_type, period_start, period_end")
+          .eq("company_id", company.id)
+          .lte("period_start", periodEnd)
+          .gte("period_end", periodStart)
+      : Promise.resolve({ data: null }),
+    company
+      ? supabase
+          .from("withholding_iva")
+          .select("*", { count: "exact", head: true })
+          .eq("company_id", company.id)
+          .eq("period", periodYm.replace("-", ""))
+          .neq("state", "cancelled")
+      : Promise.resolve({ count: 0 }),
+    company
+      ? supabase
+          .from("withholding_islr")
+          .select("*", { count: "exact", head: true })
+          .eq("company_id", company.id)
+          .eq("period", periodYm.replace("-", ""))
+          .neq("state", "cancelled")
+      : Promise.resolve({ count: 0 }),
   ]);
 
   const saleOpen = (openInvoices || []).filter((i) =>
@@ -90,6 +123,10 @@ export default async function AppHomePage() {
   const cxp = purchaseOpen.reduce(
     (s, i) => s + Number(i.amount_residual || 0),
     0,
+  );
+  const hasSaleBook = (booksForPeriod || []).some((b) => b.book_type === "sale");
+  const hasPurchaseBook = (booksForPeriod || []).some(
+    (b) => b.book_type === "purchase",
   );
 
   if (!hasCompany) {
@@ -192,6 +229,57 @@ export default async function AppHomePage() {
       </div>
 
       <section className="cifra-motion-in-delay rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-[18px]">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold">Vencimientos SENIAT</h2>
+          <p className="text-xs text-[var(--color-muted-foreground)]">
+            Período {periodYm} · vence el 15
+          </p>
+        </div>
+        <ul className="mt-3 grid gap-3 sm:grid-cols-3">
+          {dues.map((d) => {
+            let status = "Pendiente";
+            let href = "/app/books";
+            if (d.label === "IVA") {
+              status = hasSaleBook && hasPurchaseBook
+                ? `Libros emitidos${(ivaWhCount || 0) > 0 ? ` · ${ivaWhCount} ret.` : ""}`
+                : "Pendiente de libro";
+              href = "/app/books";
+            } else if (d.label.startsWith("ISLR")) {
+              status =
+                (islrWhCount || 0) > 0
+                  ? `${islrWhCount} comprobante${(islrWhCount || 0) === 1 ? "" : "s"}`
+                  : "Sin retenciones";
+              href = "/app/withholdings";
+            } else {
+              href = "/app/municipal";
+              status = "Declaración municipal";
+            }
+            return (
+              <li key={d.label}>
+                <Link
+                  href={href}
+                  className="block rounded-[var(--radius-md)] border border-[var(--color-border)] p-3 transition-colors hover:border-[var(--color-primary)]/40"
+                >
+                  <p className="text-xs text-[var(--color-muted-foreground)]">{d.label}</p>
+                  <p className="mt-1 text-sm font-semibold">Vence {d.due}</p>
+                  <p
+                    className={`mt-1 text-[11px] ${
+                      d.overdue
+                        ? "font-semibold text-[var(--color-destructive)]"
+                        : "text-[var(--color-muted-foreground)]"
+                    }`}
+                  >
+                    {d.overdue ? "Vencido · " : ""}
+                    {status}
+                  </p>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <section className="cifra-motion-in-delay rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-[18px]">
         <h2 className="text-sm font-semibold">Actividad reciente</h2>
         {(recentInvoices || []).length === 0 ? (
           <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">
@@ -213,7 +301,7 @@ export default async function AppHomePage() {
                   className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"
                 >
                   <Link
-                    href="/app/invoices"
+                    href={`/app/invoices/${inv.id}`}
                     className="font-semibold text-[var(--color-primary)] hover:underline"
                   >
                     {inv.invoice_number}

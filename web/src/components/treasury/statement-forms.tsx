@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import {
   addBankStatementLine,
   createBankStatement,
+  reconcileStatementLine,
   type ActionState,
 } from "@/lib/actions/entries";
 import { Button, FieldError, Input, Label } from "@/components/ui";
@@ -12,6 +13,15 @@ import { Select } from "@/components/layout";
 const initial: ActionState = {};
 
 type Journal = { id: string; code: string; name: string; journal_type: string };
+
+export type PaymentOption = {
+  id: string;
+  payment_date: string;
+  amount: number;
+  payment_type: string;
+  reference: string | null;
+  partner_name: string;
+};
 
 export function StatementCreateForm({
   journals,
@@ -86,12 +96,24 @@ export function StatementCreateForm({
   );
 }
 
-export function StatementLineForm({ statementId }: { statementId: string }) {
+function paymentLabel(p: PaymentOption) {
+  const kind = p.payment_type === "outbound" ? "Pago" : "Cobro";
+  const ref = p.reference ? ` · ${p.reference}` : "";
+  return `${p.payment_date} · ${kind} ${p.amount} · ${p.partner_name}${ref}`;
+}
+
+export function StatementLineForm({
+  statementId,
+  payments,
+}: {
+  statementId: string;
+  payments: PaymentOption[];
+}) {
   const [state, action, pending] = useActionState(addBankStatementLine, initial);
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <form action={action} className="grid gap-3 md:grid-cols-5">
+    <form action={action} className="grid gap-3 md:grid-cols-6">
       <input type="hidden" name="statement_id" value={statementId} />
       <div>
         <Label htmlFor={`line_date_${statementId}`}>Fecha</Label>
@@ -110,7 +132,6 @@ export function StatementLineForm({ statementId }: { statementId: string }) {
           name="amount"
           type="number"
           step="0.01"
-          required
           defaultValue="0"
         />
       </div>
@@ -122,17 +143,58 @@ export function StatementLineForm({ statementId }: { statementId: string }) {
         <Label htmlFor={`partner_${statementId}`}>Tercero (texto)</Label>
         <Input id={`partner_${statementId}`} name="partner_name" />
       </div>
-      <div className="flex items-end">
-        <Button type="submit" variant="soft" disabled={pending} className="w-full">
-          {pending ? "…" : "Agregar"}
+      <div className="md:col-span-2">
+        <Label htmlFor={`pay_${statementId}`}>Conciliar con pago</Label>
+        <Select id={`pay_${statementId}`} name="payment_id" defaultValue="">
+          <option value="">Sin conciliar</option>
+          {payments.map((p) => (
+            <option key={p.id} value={p.id}>
+              {paymentLabel(p)}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <div className="flex items-end md:col-span-6">
+        <Button type="submit" variant="soft" disabled={pending}>
+          {pending ? "…" : "Agregar línea"}
         </Button>
       </div>
-      <div className="md:col-span-5">
+      <div className="md:col-span-6">
         <FieldError message={state.error} />
         {state.success && (
           <p className="text-sm text-[var(--color-accent)]">{state.success}</p>
         )}
       </div>
+    </form>
+  );
+}
+
+export function ReconcileLineForm({
+  lineId,
+  payments,
+}: {
+  lineId: string;
+  payments: PaymentOption[];
+}) {
+  const [state, action, pending] = useActionState(reconcileStatementLine, initial);
+  if (!payments.length) return null;
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="line_id" value={lineId} />
+      <Select name="payment_id" defaultValue="" aria-label="Pago a conciliar" required>
+        <option value="">Pago…</option>
+        {payments.map((p) => (
+          <option key={p.id} value={p.id}>
+            {paymentLabel(p)}
+          </option>
+        ))}
+      </Select>
+      <Button type="submit" variant="ghost" disabled={pending}>
+        {pending ? "…" : "Conciliar"}
+      </Button>
+      {state.error ? (
+        <span className="text-xs text-[var(--color-destructive)]">{state.error}</span>
+      ) : null}
     </form>
   );
 }

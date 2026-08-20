@@ -5,8 +5,10 @@ import { getActiveCompany, periodFromDate, toUsd, getActiveTaxUnit } from "@/lib
 import { createClient } from "@/lib/supabase/server";
 import { seniatIvaWithheld, snapAlicuota } from "@/lib/seniat/txt-iva";
 import { calcIslrFromTabla } from "@/lib/seniat/islr-catalog";
+import { sameInvoiceNumber } from "@/lib/invoice-number";
+import { assertPeriodOpen } from "@/lib/actions/periods";
 
-export type ActionState = { error?: string; success?: string };
+export type ActionState = { error?: string; success?: string; id?: string };
 
 function moveMeta(moveType: string) {
   if (moveType === "out_invoice") return { operation: "V" as const, doc: "01" };
@@ -66,9 +68,16 @@ export async function createInvoice(
     return { error: "Con moneda USD indica la tasa del día (Bs por 1 USD)." };
   }
 
+  const periodCheck = await assertPeriodOpen(company.id, invoiceDate);
+  if (!periodCheck.ok) return { error: periodCheck.error };
+  if (registrationDate !== invoiceDate) {
+    const regCheck = await assertPeriodOpen(company.id, registrationDate);
+    if (!regCheck.ok) return { error: regCheck.error };
+  }
+
   const supabase = await createClient();
 
-  // Evita duplicados: misma empresa + tercero + tipo + número (activas)
+  // Evita duplicados: 146 y 000146 son el mismo número
   const normalizedNumber = invoiceNumber.trim();
   const { data: dupes } = await supabase
     .from("invoices")
@@ -77,16 +86,14 @@ export async function createInvoice(
     .eq("partner_id", partnerId)
     .eq("move_type", moveType)
     .neq("state", "cancelled")
-    .limit(50);
+    .limit(500);
 
-  const dup = (dupes || []).find(
-    (d) =>
-      String(d.invoice_number || "").trim().toLowerCase() ===
-      normalizedNumber.toLowerCase(),
+  const dup = (dupes || []).find((d) =>
+    sameInvoiceNumber(String(d.invoice_number || ""), normalizedNumber),
   );
   if (dup) {
     return {
-      error: `Ya existe la factura ${dup.invoice_number} para este proveedor/cliente (${dup.invoice_date}). No se puede registrar duplicada.`,
+      error: `Ya existe la factura ${dup.invoice_number} para este proveedor/cliente (${dup.invoice_date}). No se puede registrar duplicada (146 y 000146 son el mismo número).`,
     };
   }
 
@@ -222,6 +229,10 @@ export async function createInvoice(
     (finalTotal - finalRetained - finalRetainedIslr).toFixed(2),
   );
 
+  const igtfRate = Number(formData.get("igtf_rate") || 0) || 0;
+  const amountIgtf =
+    igtfRate > 0 ? Number(((finalTotal * igtfRate) / 100).toFixed(2)) : 0;
+
   const { data: invoice, error } = await supabase
     .from("invoices")
     .insert({
@@ -249,6 +260,8 @@ export async function createInvoice(
       amount_total: finalTotal,
       amount_retained_iva: finalRetained,
       amount_retained_islr: finalRetainedIslr,
+      igtf_rate: igtfRate,
+      amount_igtf: amountIgtf,
       amount_untaxed_usd: usdUntaxed,
       amount_tax_usd: usdTax,
       amount_exempt_usd: usdExempt,
@@ -308,9 +321,10 @@ export async function createInvoice(
       }
       await insertLines(supabase, legacy.id, company.id, normalized, false);
       await tryPostAccounting(legacy.id);
-      revalidateAll();
+      revalidateAll(legacy.id);
       return {
         success: `Factura registrada · ${legacy.id}`,
+        id: legacy.id,
       };
     }
     return { error: error.message };
@@ -345,8 +359,8 @@ export async function createInvoice(
   } catch {
     /* ignore */
   }
-  revalidateAll();
-  return { success: `Factura registrada · ${invoice.id}` };
+  revalidateAll(invoice.id);
+  return { success: `Factura registrada · ${invoice.id}`, id: invoice.id };
 }
 
 async function insertLines(
@@ -397,8 +411,9 @@ async function tryPostAccounting(invoiceId: string) {
   }
 }
 
-function revalidateAll() {
+function revalidateAll(invoiceId?: string) {
   revalidatePath("/app/invoices");
+  if (invoiceId) revalidatePath(`/app/invoices/${invoiceId}`);
   revalidatePath("/app/receivables");
   revalidatePath("/app/payables");
   revalidatePath("/app/withholdings");
@@ -576,6 +591,7 @@ export async function cancelInvoiceById(
   }
 
   revalidatePath("/app/invoices");
+  revalidatePath(`/app/invoices/${id}`);
   revalidatePath("/app/receivables");
   revalidatePath("/app/payables");
   revalidatePath("/app/books");

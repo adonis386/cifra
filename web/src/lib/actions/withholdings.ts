@@ -5,6 +5,7 @@ import { getActiveCompany, periodFromDate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { nextCompanySequence } from "@/lib/actions/sequences";
 import { applyIvaRetentionPct } from "@/lib/actions/invoices";
+import { assertPeriodOpen } from "@/lib/actions/periods";
 import {
   buildIvaTxt99035,
   formatRif99035,
@@ -27,6 +28,9 @@ export async function createIvaWithholding(
   if (!invoiceId || !voucherDate) {
     return { error: "Selecciona factura y fecha del comprobante." };
   }
+
+  const periodOk = await assertPeriodOpen(company.id, voucherDate);
+  if (!periodOk.ok) return { error: periodOk.error };
 
   const supabase = await createClient();
   const {
@@ -132,7 +136,23 @@ export async function createIvaWithholding(
 
   if (lineErr) return { error: lineErr.message };
 
+  try {
+    const { postWithholdingAccounting } = await import("@/lib/actions/accounting");
+    await postWithholdingAccounting({
+      invoiceId: invoice.id,
+      kind: "iva",
+      amount: retainedIva,
+      date: voucherDate,
+      voucherNumber,
+    });
+  } catch {
+    /* asiento se puede registrar después */
+  }
+
   revalidatePath("/app/withholdings");
+  revalidatePath("/app/invoices");
+  revalidatePath(`/app/invoices/${invoice.id}`);
+  revalidatePath("/app/ledger");
   revalidatePath("/app/config");
   return { success: `Comprobante ${voucherNumber} creado.` };
 }

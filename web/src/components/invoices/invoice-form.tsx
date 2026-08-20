@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createInvoice, type ActionState } from "@/lib/actions/invoices";
 import { nextControlNumber } from "@/lib/actions/rates";
@@ -126,6 +127,7 @@ export function InvoiceForm({
   taxUnitAmount?: number;
 }) {
   const [state, action, pending] = useActionState(createInvoice, initial);
+  const router = useRouter();
   const [ctrlPending, startCtrl] = useTransition();
   const today = new Date().toISOString().slice(0, 10);
   const [moveType, setMoveType] = useState("in_invoice");
@@ -145,6 +147,7 @@ export function InvoiceForm({
   const [importDate, setImportDate] = useState("");
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [withholdingPct, setWithholdingPct] = useState("0");
+  const [igtfRate, setIgtfRate] = useState("0");
   const [resetToken, setResetToken] = useState(state.success);
   const [retencionTouched, setRetencionTouched] = useState(false);
 
@@ -177,6 +180,7 @@ export function InvoiceForm({
     setLines([emptyLine()]);
     setRetencionTouched(false);
     setWithholdingPct(moveType.startsWith("in_") ? "75" : "0");
+    setIgtfRate("0");
     setRegistrationDate(invoiceDate || today);
   }
 
@@ -253,6 +257,10 @@ export function InvoiceForm({
     setRetencionTouched(false);
   }, [moveType]);
 
+  useEffect(() => {
+    if (state.id) router.push(`/app/invoices/${state.id}`);
+  }, [state.id, router]);
+
   const primaryRate =
     computedLines.find((l) => !l.isExempt)?.rate ??
     computedLines[0]?.rate ??
@@ -295,6 +303,7 @@ export function InvoiceForm({
         name="withholding_pct"
         value={totals.hasIva ? withholdingPct : "0"}
       />
+      <input type="hidden" name="igtf_rate" value={igtfRate} />
       <input type="hidden" name="sin_cred" value={sinCred ? "1" : "0"} />
       <input
         type="hidden"
@@ -713,7 +722,7 @@ export function InvoiceForm({
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-[var(--radius-md)] bg-[var(--color-muted)] p-4 md:grid-cols-6">
+      <div className="grid gap-3 rounded-[var(--radius-md)] bg-[var(--color-muted)] p-4 md:grid-cols-3 lg:grid-cols-7">
         <div>
           <p className="text-xs text-[var(--color-muted-foreground)]">Base gravable</p>
           <p className="font-mono text-sm font-semibold">{dual(totals.untaxed, rateNum)}</p>
@@ -729,6 +738,23 @@ export function InvoiceForm({
         <div>
           <p className="text-xs text-[var(--color-muted-foreground)]">Total</p>
           <p className="font-mono text-sm font-semibold">{dual(totals.total, rateNum)}</p>
+        </div>
+        <div>
+          <Label htmlFor="igtf_rate_ui">% IGTF</Label>
+          <Input
+            id="igtf_rate_ui"
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={igtfRate}
+            onChange={(e) => setIgtfRate(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+            {Number(igtfRate || 0) > 0
+              ? `IGTF ${dual(Number(((totals.total * Number(igtfRate || 0)) / 100).toFixed(2)), rateNum)} (no suma al total)`
+              : "Opcional · débito/efectivo"}
+          </p>
         </div>
         <div>
           <Label htmlFor="withholding_pct_ui">% ret. IVA</Label>

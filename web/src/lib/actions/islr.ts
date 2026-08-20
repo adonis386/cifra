@@ -5,6 +5,7 @@ import { getActiveCompany, periodFromDate, getActiveTaxUnit } from "@/lib/compan
 import { createClient } from "@/lib/supabase/server";
 import { buildIslrXml } from "@/lib/seniat/xml-islr";
 import { nextCompanySequence } from "@/lib/actions/sequences";
+import { assertPeriodOpen } from "@/lib/actions/periods";
 import {
   calcIslrFromTabla,
   seniatConceptLabel,
@@ -168,6 +169,9 @@ export async function createIslrWithholding(
     return { error: "Completa factura y fecha del comprobante." };
   }
 
+  const periodOk = await assertPeriodOpen(company.id, voucherDate);
+  if (!periodOk.ok) return { error: periodOk.error };
+
   const computed = await computeIslrForInvoice(invoiceId, company.id);
   if (computed.error) return { error: computed.error };
   if (!computed.lines.length || computed.totalWithheld <= 0) {
@@ -299,8 +303,28 @@ async function persistIslrWithholding(input: {
     .update({ amount_retained_islr: input.computed.totalWithheld })
     .eq("id", input.invoiceId);
 
+  const { data: head } = await supabase
+    .from("withholding_islr")
+    .select("voucher_number")
+    .eq("id", withholdingId)
+    .maybeSingle();
+  try {
+    const { postWithholdingAccounting } = await import("@/lib/actions/accounting");
+    await postWithholdingAccounting({
+      invoiceId: input.invoiceId,
+      kind: "islr",
+      amount: input.computed.totalWithheld,
+      date: input.voucherDate,
+      voucherNumber: head?.voucher_number || withholdingId!,
+    });
+  } catch {
+    /* asiento se puede registrar después */
+  }
+
   revalidatePath("/app/withholdings");
   revalidatePath("/app/invoices");
+  revalidatePath(`/app/invoices/${input.invoiceId}`);
+  revalidatePath("/app/ledger");
   revalidatePath("/app/config");
   return {
     success: `Comprobante ISLR · retenido ${input.computed.totalWithheld.toFixed(2)}`,

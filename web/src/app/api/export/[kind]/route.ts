@@ -149,7 +149,14 @@ export async function GET(
         return xlsxResponse(`cifra-balance-${today}.xlsx`, buf);
       }
       case "invoices": {
-        const data = await loadInvoicesList(q.get("tipo") || undefined);
+        const data = await loadInvoicesList({
+          tipo: q.get("tipo") || undefined,
+          partner: q.get("partner") || undefined,
+          from: q.get("from") || undefined,
+          to: q.get("to") || undefined,
+          q: q.get("q") || undefined,
+          estado: q.get("estado") || undefined,
+        });
         if (!data) return new Response("Sin empresa", { status: 400 });
         const buf = buildXlsxBuffer([
           {

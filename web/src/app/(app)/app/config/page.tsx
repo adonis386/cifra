@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BrandingForm } from "@/components/config/branding-form";
 import { ConfigForms } from "@/components/config/config-forms";
 import { SequenceConfigForm } from "@/components/config/sequence-config-form";
+import { PeriodCloseForm } from "@/components/config/period-close-form";
 import { getCompanyPrintProfile } from "@/lib/company-print";
 import {
   formatMoney,
@@ -10,6 +11,7 @@ import {
   getActiveTaxUnit,
 } from "@/lib/company";
 import { listCompanySequences } from "@/lib/actions/sequences";
+import { listAccountingPeriods } from "@/lib/actions/periods";
 import { createClient } from "@/lib/supabase/server";
 import {
   DataTable,
@@ -38,7 +40,7 @@ export default async function ConfigPage() {
 
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
-  const [branding, { data: units }, { data: concepts }, { data: rates }, rateToday, sequences, utAmount] =
+  const [branding, { data: units }, { data: concepts }, { data: rates }, rateToday, sequences, utAmount, periods] =
     await Promise.all([
       getCompanyPrintProfile(company.id),
       supabase
@@ -61,6 +63,7 @@ export default async function ConfigPage() {
       getExchangeRate(company.id, today),
       listCompanySequences(),
       getActiveTaxUnit(company.id, today),
+      listAccountingPeriods(),
     ]);
 
   const latest =
@@ -98,6 +101,13 @@ export default async function ConfigPage() {
         description="Aquí se configura la numeración de retenciones IVA/ISLR y el N° de control."
       >
         <SequenceConfigForm sequences={sequences} />
+      </SectionCard>
+
+      <SectionCard
+        title="Cierre de período"
+        description="Bloquea facturas, pagos y asientos en un mes ya declarado."
+      >
+        <PeriodCloseForm periods={periods} />
       </SectionCard>
 
       <SectionCard

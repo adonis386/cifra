@@ -22,7 +22,7 @@ export default async function PrintInvoicePage({
   if (!company) notFound();
 
   const supabase = await createClient();
-  const [profile, { data: inv }] = await Promise.all([
+  const [profile, { data: inv }, igtfRes] = await Promise.all([
     getCompanyPrintProfile(company.id),
     supabase
       .from("invoices")
@@ -38,6 +38,7 @@ export default async function PrintInvoicePage({
       .eq("id", id)
       .eq("company_id", company.id)
       .single(),
+    supabase.from("invoices").select("amount_igtf, igtf_rate").eq("id", id).maybeSingle(),
   ]);
 
   if (!inv || !profile) notFound();
@@ -72,6 +73,9 @@ export default async function PrintInvoicePage({
 
   const rate = Number(inv.exchange_rate || 0);
   const title = moveTitle[inv.move_type] || "Documento fiscal";
+  const igtf = igtfRes.error
+    ? 0
+    : Number((igtfRes.data as { amount_igtf?: number } | null)?.amount_igtf || 0);
   const neto =
     Number(inv.amount_total) -
     Number(inv.amount_retained_iva || 0) -
@@ -243,6 +247,14 @@ export default async function PrintInvoicePage({
                         : ""}
                     </td>
                   </tr>
+                  {igtf > 0 ? (
+                    <tr>
+                      <td>IGTF</td>
+                      <td style={{ textAlign: "right", fontFamily: "monospace" }}>
+                        {formatMoney(igtf)} Bs
+                      </td>
+                    </tr>
+                  ) : null}
                   <tr>
                     <td>Ret. IVA</td>
                     <td style={{ textAlign: "right", fontFamily: "monospace" }}>

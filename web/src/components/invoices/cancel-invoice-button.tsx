@@ -4,7 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui";
 
-export function CancelInvoiceButton({ invoiceId }: { invoiceId: string }) {
+export function CancelInvoiceButton({
+  invoiceId,
+  redirectTo,
+}: {
+  invoiceId: string;
+  redirectTo?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +34,8 @@ export function CancelInvoiceButton({ invoiceId }: { invoiceId: string }) {
           setError(data.error || "No se pudo anular.");
           return;
         }
-        router.refresh();
+        if (redirectTo) router.push(redirectTo);
+        else router.refresh();
       } catch {
         setError("Error de red al anular.");
       }

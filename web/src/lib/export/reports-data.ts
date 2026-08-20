@@ -1,6 +1,7 @@
 import { agingBucket, partnerName } from "@/lib/export/aging";
 import { getActiveCompany, getExchangeRate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+import { sameInvoiceNumber } from "@/lib/invoice-number";
 
 export async function requireCompanyContext() {
   const company = await getActiveCompany();
@@ -237,14 +238,27 @@ export async function loadTrialBalance() {
   return { ...ctx, rows };
 }
 
-export async function loadInvoicesList(tipo?: string) {
+export async function loadInvoicesList(filters?: {
+  tipo?: string;
+  partner?: string;
+  from?: string;
+  to?: string;
+  q?: string;
+  estado?: string;
+}) {
   const ctx = await requireCompanyContext();
   if (!ctx) return null;
+  const tipo = filters?.tipo;
+  const partnerId = String(filters?.partner || "").trim();
+  const from = String(filters?.from || "").trim();
+  const to = String(filters?.to || "").trim();
+  const q = String(filters?.q || "").trim();
+  const estado = String(filters?.estado || "").trim();
 
   let query = ctx.supabase
     .from("invoices")
     .select(
-      "invoice_date, move_type, invoice_number, control_number, amount_untaxed, amount_tax, amount_total, amount_retained_iva, amount_residual, payment_state, currency_code, exchange_rate, partners(name, rif)",
+      "invoice_date, move_type, invoice_number, control_number, amount_untaxed, amount_tax, amount_total, amount_retained_iva, amount_residual, payment_state, currency_code, exchange_rate, state, partners(name, rif)",
     )
     .eq("company_id", ctx.company.id)
     .order("invoice_date", { ascending: false })
@@ -254,8 +268,28 @@ export async function loadInvoicesList(tipo?: string) {
   } else if (tipo === "compras") {
     query = query.in("move_type", ["in_invoice", "in_refund"]);
   }
+  if (estado === "cancelled") query = query.eq("state", "cancelled");
+  else if (estado === "confirmed") query = query.eq("state", "confirmed");
+  else query = query.neq("state", "cancelled");
+  if (partnerId) query = query.eq("partner_id", partnerId);
+  if (from) query = query.gte("invoice_date", from);
+  if (to) query = query.lte("invoice_date", to);
+  if (estado === "paid" || estado === "not_paid" || estado === "partial") {
+    query = query.eq("payment_state", estado);
+  }
 
   const { data: invoices } = await query;
+  const filtered = q
+    ? (invoices || []).filter((inv) => {
+        const num = String(inv.invoice_number || "");
+        const ctrl = String(inv.control_number || "");
+        return (
+          sameInvoiceNumber(num, q) ||
+          num.toLowerCase().includes(q.toLowerCase()) ||
+          ctrl.toLowerCase().includes(q.toLowerCase())
+        );
+      })
+    : invoices || [];
 
   const moveLabel: Record<string, string> = {
     in_invoice: "Compra",
@@ -264,7 +298,7 @@ export async function loadInvoicesList(tipo?: string) {
     out_refund: "N/C venta",
   };
 
-  const rows = (invoices || []).map((inv) => {
+  const rows = filtered.map((inv) => {
     const p = partnerName(inv.partners as never);
     return {
       fecha: inv.invoice_date,
