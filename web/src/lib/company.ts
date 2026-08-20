@@ -243,3 +243,29 @@ export async function getExchangeRate(
 
   return existing;
 }
+
+/** UT vigente: primero la de la empresa, si no hay usa la global. */
+export async function getActiveTaxUnit(companyId: string, onDate?: string) {
+  const supabase = await createClient();
+  const day = (onDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
+
+  const { data: owned } = await supabase
+    .from("tax_units")
+    .select("amount, date_from")
+    .eq("company_id", companyId)
+    .lte("date_from", day)
+    .order("date_from", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (owned?.amount != null) return Number(owned.amount);
+
+  const { data: global } = await supabase
+    .from("tax_units")
+    .select("amount")
+    .is("company_id", null)
+    .lte("date_from", day)
+    .order("date_from", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return Number(global?.amount || 0);
+}

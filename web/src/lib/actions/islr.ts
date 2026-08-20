@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getActiveCompany, periodFromDate } from "@/lib/company";
+import { getActiveCompany, periodFromDate, getActiveTaxUnit } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { buildIslrXml } from "@/lib/seniat/xml-islr";
 import { nextCompanySequence } from "@/lib/actions/sequences";
@@ -31,22 +31,15 @@ export async function createIslrWithholding(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: invoice }, { data: rate }, { data: ut }] = await Promise.all([
+  const [{ data: invoice }, { data: rate }, utAmount] = await Promise.all([
     supabase.from("invoices").select("*").eq("id", invoiceId).eq("company_id", company.id).single(),
     supabase.from("islr_rates").select("*, islr_concepts(code, name)").eq("id", rateId).single(),
-    supabase
-      .from("tax_units")
-      .select("amount")
-      .or(`company_id.eq.${company.id},company_id.is.null`)
-      .order("date_from", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    getActiveTaxUnit(company.id, voucherDate),
   ]);
 
   if (!invoice) return { error: "Factura no encontrada." };
   if (!rate) return { error: "Tarifa ISLR no encontrada." };
 
-  const utAmount = Number(ut?.amount || 0);
   const calc = calcIslrWithholding({
     base: baseAmount,
     rate: Number(rate.rate || 0),

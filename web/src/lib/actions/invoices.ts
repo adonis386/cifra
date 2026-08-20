@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getActiveCompany, periodFromDate, toUsd } from "@/lib/company";
+import { getActiveCompany, periodFromDate, toUsd, getActiveTaxUnit } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { seniatIvaWithheld, snapAlicuota } from "@/lib/seniat/txt-iva";
 import { calcIslrWithholding } from "@/lib/seniat/islr-calc";
@@ -191,7 +191,7 @@ export async function createInvoice(
     ...new Set(normalized.map((l) => l.concept_id).filter(Boolean) as string[]),
   ];
   if (conceptIds.length) {
-    const [{ data: partner }, { data: rates }, { data: ut }] = await Promise.all([
+    const [{ data: partner }, { data: rates }, utAmount] = await Promise.all([
       supabase
         .from("partners")
         .select("person_type")
@@ -202,16 +202,9 @@ export async function createInvoice(
         .select("concept_id, person_type, rate, base_percent, subtract_ut, minimum_ut")
         .in("concept_id", conceptIds)
         .eq("active", true),
-      supabase
-        .from("tax_units")
-        .select("amount")
-        .or(`company_id.eq.${company.id},company_id.is.null`)
-        .order("date_from", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+      getActiveTaxUnit(company.id, invoiceDate),
     ]);
     const personType = partner?.person_type === "natural" ? "natural" : "juridica";
-    const utAmount = Number(ut?.amount || 0);
     for (const line of normalized) {
       if (!line.concept_id) continue;
       const rate =

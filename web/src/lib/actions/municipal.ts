@@ -96,20 +96,48 @@ export async function saveTaxUnit(
 ): Promise<ActionState> {
   const company = await getActiveCompany();
   if (!company) return { error: "Crea una empresa primero." };
-  const amount = Number(formData.get("amount") || 0);
+  const raw = String(formData.get("amount") || "")
+    .trim()
+    .replace(/\s/g, "")
+    .replace(",", ".");
+  const amount = Number(raw);
   const dateFrom = String(formData.get("date_from") || "");
-  if (amount <= 0 || !dateFrom) return { error: "Indica monto UT y fecha." };
+  if (!(amount > 0) || !dateFrom) {
+    return { error: "Indica el monto de la UT (ej. 43 o 43,00) y la fecha de vigencia." };
+  }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("tax_units").insert({
+  const { data: existing } = await supabase
+    .from("tax_units")
+    .select("id")
+    .eq("company_id", company.id)
+    .eq("date_from", dateFrom)
+    .maybeSingle();
+
+  const payload = {
     company_id: company.id,
-    name: "UT",
+    name: "UT SENIAT",
     amount,
     date_from: dateFrom,
-  });
-  if (error) return { error: error.message };
+  };
+
+  const { error } = existing
+    ? await supabase.from("tax_units").update(payload).eq("id", existing.id)
+    : await supabase.from("tax_units").insert(payload);
+
+  if (error) {
+    if (/row-level security|42501/i.test(error.message)) {
+      return {
+        error:
+          "No tienes permiso para cambiar la UT. Entra con el usuario dueño o administrador de la empresa.",
+      };
+    }
+    return { error: error.message };
+  }
   revalidatePath("/app/config");
-  return { success: "Unidad tributaria guardada." };
+  revalidatePath("/app/invoices");
+  revalidatePath("/app/withholdings");
+  return { success: `UT ${amount.toFixed(2)} Bs vigente desde ${dateFrom}.` };
 }
 
 export async function cloneGlobalCatalogs(): Promise<ActionState> {

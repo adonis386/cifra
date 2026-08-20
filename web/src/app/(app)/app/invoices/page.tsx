@@ -8,6 +8,7 @@ import {
   formatMoney,
   getActiveCompany,
   getExchangeRate,
+  getActiveTaxUnit,
 } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -47,7 +48,7 @@ export default async function InvoicesPage() {
     { data: invoices },
     { data: concepts },
     { data: islrRates },
-    { data: taxUnit },
+    taxUnitAmount,
     productsRes,
     rate,
   ] = await Promise.all([
@@ -74,13 +75,7 @@ export default async function InvoicesPage() {
         .from("islr_rates")
         .select("concept_id, person_type, rate, subtract_ut, base_percent, minimum_ut")
         .eq("active", true),
-      supabase
-        .from("tax_units")
-        .select("amount")
-        .or(`company_id.eq.${company.id},company_id.is.null`)
-        .order("date_from", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+      getActiveTaxUnit(company.id, today),
       supabase
         .from("products")
         .select("id, code, name, price_unit, tax_code")
@@ -139,7 +134,7 @@ export default async function InvoicesPage() {
           }))}
           products={productList}
           initialRate={rate || 0}
-          taxUnitAmount={Number(taxUnit?.amount || 0)}
+          taxUnitAmount={taxUnitAmount}
         />
       </SectionCard>
 

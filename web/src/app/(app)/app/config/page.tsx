@@ -3,7 +3,12 @@ import { BrandingForm } from "@/components/config/branding-form";
 import { ConfigForms } from "@/components/config/config-forms";
 import { SequenceConfigForm } from "@/components/config/sequence-config-form";
 import { getCompanyPrintProfile } from "@/lib/company-print";
-import { formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
+import {
+  formatMoney,
+  getActiveCompany,
+  getExchangeRate,
+  getActiveTaxUnit,
+} from "@/lib/company";
 import { listCompanySequences } from "@/lib/actions/sequences";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -33,7 +38,7 @@ export default async function ConfigPage() {
 
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
-  const [branding, { data: units }, { data: concepts }, { data: rates }, rateToday, sequences] =
+  const [branding, { data: units }, { data: concepts }, { data: rates }, rateToday, sequences, utAmount] =
     await Promise.all([
       getCompanyPrintProfile(company.id),
       supabase
@@ -55,6 +60,7 @@ export default async function ConfigPage() {
         .limit(12),
       getExchangeRate(company.id, today),
       listCompanySequences(),
+      getActiveTaxUnit(company.id, today),
     ]);
 
   const latest =
@@ -98,7 +104,14 @@ export default async function ConfigPage() {
         title="Parámetros fiscales"
         description="Tasa BCV automática, UT y catálogo ISLR."
       >
-        <ConfigForms latestRate={latest} />
+        <ConfigForms
+          latestRate={latest}
+          currentUt={
+            utAmount > 0
+              ? { amount: utAmount, date_from: today }
+              : null
+          }
+        />
       </SectionCard>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -140,6 +153,7 @@ export default async function ConfigPage() {
                   <Th>Nombre</Th>
                   <Th>Desde</Th>
                   <Th className="text-right">Monto</Th>
+                  <Th>Ámbito</Th>
                 </tr>
               </thead>
               <tbody>
@@ -148,8 +162,9 @@ export default async function ConfigPage() {
                     <Td>{u.name}</Td>
                     <Td>{u.date_from}</Td>
                     <Td className="text-right font-mono text-xs">
-                      {Number(u.amount).toFixed(4)}
+                      {Number(u.amount).toFixed(2)}
                     </Td>
+                    <Td>{u.company_id ? "Empresa" : "Global"}</Td>
                   </tr>
                 ))}
               </tbody>

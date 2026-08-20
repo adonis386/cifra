@@ -11,8 +11,10 @@ import { Button, FieldError, Input, Label } from "@/components/ui";
 
 export function ConfigForms({
   latestRate,
+  currentUt,
 }: {
   latestRate?: { rate: number; rate_date: string; source?: string } | null;
+  currentUt?: { amount: number; date_from: string } | null;
 }) {
   const [utState, utAction, utPending] = useActionState(saveTaxUnit, {});
   const [rateState, rateAction, ratePending] = useActionState(saveExchangeRate, {});
@@ -89,10 +91,25 @@ export function ConfigForms({
       </div>
 
       <form action={utAction} className="space-y-3">
-        <h3 className="font-semibold">Nueva Unidad Tributaria</h3>
+        <h3 className="font-semibold">Unidad Tributaria</h3>
+        <p className="text-sm text-[var(--color-muted-foreground)]">
+          SENIAT SNAT/2025/000048: <strong>43,00 Bs</strong>. Acepta 43 o 43,00.
+        </p>
+        {currentUt ? (
+          <p className="rounded-[var(--radius-md)] bg-[var(--color-muted)] px-3 py-2 font-mono text-sm">
+            Vigente {currentUt.date_from}: {currentUt.amount.toFixed(2)} Bs
+          </p>
+        ) : null}
         <div>
-          <Label htmlFor="amount">Monto UT</Label>
-          <Input id="amount" name="amount" type="number" step="0.0001" required defaultValue="0.40" />
+          <Label htmlFor="amount">Monto UT (Bs)</Label>
+          <Input
+            id="amount"
+            name="amount"
+            inputMode="decimal"
+            required
+            defaultValue={currentUt?.amount ? String(currentUt.amount) : "43"}
+            placeholder="43,00"
+          />
         </div>
         <div>
           <Label htmlFor="date_from">Vigente desde</Label>
