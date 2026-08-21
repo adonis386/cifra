@@ -40,7 +40,7 @@ export default async function InvoiceDetailPage({
   if (!company) notFound();
 
   const supabase = await createClient();
-  const { data: inv } = await supabase
+  const { data: inv, error: invError } = await supabase
     .from("invoices")
     .select(
       `id, move_type, state, invoice_date, registration_date, due_date,
@@ -48,11 +48,26 @@ export default async function InvoiceDetailPage({
        amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva,
        amount_retained_islr, amount_paid, amount_residual, payment_state, notes, sin_cred,
        partners(name, rif, address, phone, person_type),
-       invoice_lines(id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total, amount_exempt)`,
+       invoice_lines(id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total)`,
     )
     .eq("id", id)
     .eq("company_id", company.id)
-    .single();
+    .maybeSingle();
+
+  if (invError) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Factura" description="No se pudo abrir el documento." />
+        <p className="text-sm text-[var(--color-destructive)]">{invError.message}</p>
+        <Link
+          href="/app/invoices"
+          className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+        >
+          Volver al listado
+        </Link>
+      </div>
+    );
+  }
 
   if (!inv) notFound();
 
