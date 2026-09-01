@@ -14,7 +14,13 @@ import {
   snapAlicuota,
 } from "@/lib/seniat/txt-iva";
 
-export type ActionState = { error?: string; success?: string; txt?: string };
+export type ActionState = {
+  error?: string;
+  success?: string;
+  txt?: string;
+  date_from?: string;
+  date_to?: string;
+};
 
 export async function createIvaWithholding(
   _prev: ActionState,
@@ -193,9 +199,27 @@ export async function exportIvaTxt(
   const company = await getActiveCompany();
   if (!company) return { error: "Crea una empresa primero." };
 
-  const period = String(formData.get("period") || "").replace("-", "");
-  if (!/^\d{6}$/.test(period)) {
-    return { error: "Período inválido. Usa AAAAMM o YYYY-MM." };
+  const dateFrom = String(formData.get("date_from") || "").trim();
+  const dateTo = String(formData.get("date_to") || "").trim();
+  // Compatibilidad: si solo mandan período mensual (AAAAMM / YYYY-MM)
+  const periodRaw = String(formData.get("period") || "").replace("-", "");
+
+  let from = dateFrom;
+  let to = dateTo;
+  if ((!from || !to) && /^\d{6}$/.test(periodRaw)) {
+    const y = periodRaw.slice(0, 4);
+    const m = periodRaw.slice(4, 6);
+    from = `${y}-${m}-01`;
+    to = new Date(Number(y), Number(m), 0).toISOString().slice(0, 10);
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return {
+      error: "Indica el lapso con fechas Desde y Hasta (AAAA-MM-DD).",
+    };
+  }
+  if (from > to) {
+    return { error: "La fecha Desde no puede ser posterior a Hasta." };
   }
 
   const supabase = await createClient();
@@ -205,11 +229,15 @@ export async function exportIvaTxt(
       "voucher_number, period, voucher_date, partners(rif), withholding_iva_lines(*)",
     )
     .eq("company_id", company.id)
-    .eq("period", period)
-    .neq("state", "cancelled");
+    .gte("voucher_date", from)
+    .lte("voucher_date", to)
+    .neq("state", "cancelled")
+    .order("voucher_date");
 
   if (error) return { error: error.message };
-  if (!headers?.length) return { error: "No hay retenciones en ese período." };
+  if (!headers?.length) {
+    return { error: `No hay retenciones IVA del ${from} al ${to}.` };
+  }
 
   const agentRif = formatRif99035(company.rif);
   if (agentRif.length !== 10) {
@@ -252,7 +280,7 @@ export async function exportIvaTxt(
       }
       lines.push({
         agentRif,
-        period: wh.period,
+        period: wh.period || periodFromDate(wh.voucher_date),
         invoiceDate: line.invoice_date || wh.voucher_date,
         operationType: line.operation_type,
         docType: line.doc_type,
@@ -274,7 +302,9 @@ export async function exportIvaTxt(
 
   const txt = buildIvaTxt99035(lines);
   return {
-    success: `TXT generado (${lines.length} línea(s)).`,
+    success: `TXT ${from} → ${to}: ${lines.length} línea(s).`,
     txt,
+    date_from: from,
+    date_to: to,
   };
 }

@@ -23,12 +23,27 @@ export function WithholdingHub({
   const [xmlState, xmlAction, xmlPending] = useActionState(exportIslrXml, {});
   const [txt, setTxt] = useState("");
   const [xml, setXml] = useState("");
+  const [txtRange, setTxtRange] = useState({ from: "", to: "" });
   const today = new Date().toISOString().slice(0, 10);
   const periodDefault = today.slice(0, 7);
+  const monthStart = `${periodDefault}-01`;
+  const monthEnd = new Date(
+    Number(periodDefault.slice(0, 4)),
+    Number(periodDefault.slice(5, 7)),
+    0,
+  )
+    .toISOString()
+    .slice(0, 10);
 
   useEffect(() => {
-    if (txtState.txt) setTxt(txtState.txt);
-  }, [txtState.txt]);
+    if (txtState.txt) {
+      setTxt(txtState.txt);
+      setTxtRange({
+        from: txtState.date_from || "",
+        to: txtState.date_to || "",
+      });
+    }
+  }, [txtState.txt, txtState.date_from, txtState.date_to]);
   useEffect(() => {
     if (xmlState.xml) setXml(xmlState.xml);
   }, [xmlState.xml]);
@@ -81,22 +96,50 @@ export function WithholdingHub({
 
           <form action={txtAction} className="space-y-3">
             <h3 className="font-semibold">Exportar TXT</h3>
-            <div>
-              <Label htmlFor="period">Período</Label>
-              <Input id="period" name="period" type="month" required defaultValue={periodDefault} />
+            <p className="text-xs text-[var(--color-muted-foreground)]">
+              Elige el lapso de declaración (ej. 16/08 al 31/08). Se incluyen
+              comprobantes IVA cuya fecha caiga en ese rango.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="date_from">Desde</Label>
+                <Input
+                  id="date_from"
+                  name="date_from"
+                  type="date"
+                  required
+                  defaultValue={monthStart}
+                />
+              </div>
+              <div>
+                <Label htmlFor="date_to">Hasta</Label>
+                <Input
+                  id="date_to"
+                  name="date_to"
+                  type="date"
+                  required
+                  defaultValue={monthEnd}
+                />
+              </div>
             </div>
             <FieldError message={txtState.error} />
-            {txtState.success && <p className="text-sm text-[var(--color-accent)]">{txtState.success}</p>}
+            {txtState.success && (
+              <p className="text-sm text-[var(--color-accent)]">{txtState.success}</p>
+            )}
             <Button type="submit" disabled={txtPending}>
               {txtPending ? "Generando…" : "Generar TXT 99035"}
             </Button>
             {txt && (
               <div className="space-y-2">
-                <textarea className="h-40 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-muted)] p-3 font-mono text-xs" readOnly value={txt} />
+                <textarea
+                  className="h-40 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-muted)] p-3 font-mono text-xs"
+                  readOnly
+                  value={txt}
+                />
                 <a
                   className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
                   href={`data:text/plain;charset=utf-8,${encodeURIComponent(txt)}`}
-                  download={`iva_${periodDefault.replace("-", "")}.txt`}
+                  download={`iva_${(txtRange.from || monthStart).replace(/-/g, "")}_${(txtRange.to || monthEnd).replace(/-/g, "")}.txt`}
                 >
                   Descargar TXT
                 </a>
