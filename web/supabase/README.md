@@ -17,7 +17,16 @@
    - `migrations/20260812000010_fix_doc_state_posted.sql` ← default payments → `confirmed`
    - `migrations/20260812000011_company_print_branding.sql` ← membrete PDF (logo, pie, subtítulo)
 
-O pega el contenido de `migrations/ALL.sql` (si existe) de una vez, y luego aplica `00008` si ALL aún no la incluye.
+O pega el contenido de `migrations/ALL.sql` (si existe) de una vez, y luego aplica migraciones posteriores que ALL aún no incluya.
+
+## Reset desde cero (conservar login)
+
+Para **borrar todos los datos de negocio** y dejar solo usuarios de Authentication:
+
+1. SQL Editor → pega `migrations/WIPE_KEEP_AUTH.sql` → **Run**
+2. En Cifra: crea de nuevo la empresa y carga datos
+
+No borra `auth.users`. Sí limpia empresas, facturas, retenciones, libros, asientos y logos; recrea `profiles` y catálogos globales (IVA / UT).
 
 ## Tablas
 
