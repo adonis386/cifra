@@ -131,10 +131,10 @@ export default async function AppHomePage() {
 
   if (!hasCompany) {
     return (
-      <div className="cifra-motion-in space-y-6">
+      <div className="sifra-motion-in space-y-6">
         <PageHeader
           eyebrow="Bienvenido"
-          title="Cifra"
+          title="Sifra"
           description="Registra tu empresa con RIF para emitir libros y retenciones SENIAT."
           actions={
             <Link href="/app/empresa/nueva">
@@ -151,7 +151,7 @@ export default async function AppHomePage() {
 
   return (
     <div className="space-y-7">
-      <div className="cifra-motion-in flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="sifra-motion-in flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1.5">
           <p className="text-sm text-[var(--color-muted-foreground)]">
             {greeting}
@@ -167,7 +167,7 @@ export default async function AppHomePage() {
         </Link>
       </div>
 
-      <div className="cifra-motion-in-delay flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-[18px] py-4">
+      <div className="sifra-motion-in-delay flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] px-[18px] py-4">
         <span className="text-xs text-[var(--color-muted-foreground)]">
           Tasa BCV
         </span>
@@ -189,7 +189,7 @@ export default async function AppHomePage() {
         ) : null}
       </div>
 
-      <div className="cifra-motion-in-delay grid gap-4 sm:grid-cols-3">
+      <div className="sifra-motion-in-delay grid gap-4 sm:grid-cols-3">
         {[
           {
             label: "Por cobrar",
@@ -228,7 +228,7 @@ export default async function AppHomePage() {
         ))}
       </div>
 
-      <section className="cifra-motion-in-delay rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-[18px]">
+      <section className="sifra-motion-in-delay rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-[18px]">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-semibold">Vencimientos SENIAT</h2>
           <p className="text-xs text-[var(--color-muted-foreground)]">
@@ -279,7 +279,7 @@ export default async function AppHomePage() {
         </ul>
       </section>
 
-      <section className="cifra-motion-in-delay rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-[18px]">
+      <section className="sifra-motion-in-delay rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-[18px]">
         <h2 className="text-sm font-semibold">Actividad reciente</h2>
         {(recentInvoices || []).length === 0 ? (
           <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">

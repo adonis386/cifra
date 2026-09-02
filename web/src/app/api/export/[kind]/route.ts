@@ -51,7 +51,7 @@ export async function GET(
             })),
           },
         ]);
-        return xlsxResponse(`cifra-cxc-${data.today}.xlsx`, buf);
+        return xlsxResponse(`sifra-cxc-${data.today}.xlsx`, buf);
       }
       case "payables": {
         const data = await loadOpenInvoices("payable");
@@ -73,7 +73,7 @@ export async function GET(
             })),
           },
         ]);
-        return xlsxResponse(`cifra-cxp-${data.today}.xlsx`, buf);
+        return xlsxResponse(`sifra-cxp-${data.today}.xlsx`, buf);
       }
       case "statements": {
         const partnerId = q.get("partner") || "";
@@ -98,7 +98,7 @@ export async function GET(
           },
         ]);
         return xlsxResponse(
-          `cifra-edo-cuenta-${data.partner.rif}-${from}_${to}.xlsx`,
+          `sifra-edo-cuenta-${data.partner.rif}-${from}_${to}.xlsx`,
           buf,
         );
       }
@@ -126,7 +126,7 @@ export async function GET(
           },
         ]);
         return xlsxResponse(
-          `cifra-mayor-${data.account.code}-${from}_${to}.xlsx`,
+          `sifra-mayor-${data.account.code}-${from}_${to}.xlsx`,
           buf,
         );
       }
@@ -146,7 +146,7 @@ export async function GET(
           },
         ]);
         const today = new Date().toISOString().slice(0, 10);
-        return xlsxResponse(`cifra-balance-${today}.xlsx`, buf);
+        return xlsxResponse(`sifra-balance-${today}.xlsx`, buf);
       }
       case "invoices": {
         const data = await loadInvoicesList({
@@ -180,7 +180,7 @@ export async function GET(
           },
         ]);
         const today = new Date().toISOString().slice(0, 10);
-        return xlsxResponse(`cifra-facturas-${today}.xlsx`, buf);
+        return xlsxResponse(`sifra-facturas-${today}.xlsx`, buf);
       }
       case "book": {
         const id = q.get("id") || "";
@@ -264,7 +264,7 @@ export async function GET(
           },
         ]);
         return xlsxResponse(
-          `cifra-libro-${data.book.book_type}-${data.book.period_start}.xlsx`,
+          `sifra-libro-${data.book.book_type}-${data.book.period_start}.xlsx`,
           buf,
         );
       }
@@ -289,7 +289,7 @@ export async function GET(
           },
         ]);
         const today = new Date().toISOString().slice(0, 10);
-        return xlsxResponse(`cifra-pagos-${today}.xlsx`, buf);
+        return xlsxResponse(`sifra-pagos-${today}.xlsx`, buf);
       }
       default:
         return new Response("Reporte desconocido", { status: 404 });

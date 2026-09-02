@@ -1,5 +1,5 @@
 -- =============================================================================
--- Cifra — Seed de demo para reportes
+-- Sifra — Seed de demo para reportes
 -- User: f97bbcb7-d10b-472c-9fcb-c470ed9e11a9
 --
 -- Cómo usar:
@@ -7,7 +7,7 @@
 --   2. Pega este archivo completo → Run
 --   3. Recarga la app (tablero, CxC/CxP, mayor, estado de cuenta, reportes)
 --
--- Idempotente: borra datos previos con notes = 'SEED_CIFRA_REPORTS' de la
+-- Idempotente: borra datos previos con notes = 'SEED_SIFRA_REPORTS' de la
 -- empresa del usuario (o crea empresa demo si no tiene).
 -- =============================================================================
 
@@ -86,11 +86,11 @@ begin
     insert into public.companies (id, name, rif, address, phone, email, is_withholding_agent, is_special_taxpayer, created_by)
     values (
       'e5000000-0000-4000-8000-000000000001',
-      'Cifra Demo Seed CA',
+      'Sifra Demo Seed CA',
       'J500000001',
       'Caracas, VE',
       '0212-5550000',
-      'demo@cifra.local',
+      'demo@sifra.local',
       true,
       true,
       v_user
@@ -133,32 +133,32 @@ begin
   delete from public.payment_allocations
   where company_id = v_company
     and payment_id in (
-      select id from public.payments where company_id = v_company and coalesce(memo, '') = 'SEED_CIFRA_REPORTS'
+      select id from public.payments where company_id = v_company and coalesce(memo, '') = 'SEED_SIFRA_REPORTS'
     );
 
   delete from public.payments
-  where company_id = v_company and coalesce(memo, '') = 'SEED_CIFRA_REPORTS';
+  where company_id = v_company and coalesce(memo, '') = 'SEED_SIFRA_REPORTS';
 
   delete from public.account_move_lines
   where company_id = v_company
     and move_id in (
-      select id from public.account_moves where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS'
+      select id from public.account_moves where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS'
     );
 
   delete from public.account_moves
-  where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS';
+  where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS';
 
   delete from public.invoice_lines
   where company_id = v_company
     and invoice_id in (
-      select id from public.invoices where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS'
+      select id from public.invoices where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS'
     );
 
   delete from public.invoices
-  where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS';
+  where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS';
 
   delete from public.partners
-  where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS';
+  where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS';
 
   delete from public.exchange_rates
   where company_id = v_company and source = 'seed';
@@ -170,19 +170,19 @@ begin
   where company_id = v_company
     and withholding_id in (
       select id from public.withholding_iva
-      where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS'
+      where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS'
     );
   delete from public.withholding_iva
-  where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS';
+  where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS';
 
   delete from public.fiscal_book_lines
   where company_id = v_company
     and book_id in (
       select id from public.fiscal_books
-      where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS'
+      where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS'
     );
   delete from public.fiscal_books
-  where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS';
+  where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS';
 
   -- bank statements (migración 09; ignore if missing)
   begin
@@ -190,10 +190,10 @@ begin
     where company_id = v_company
       and statement_id in (
         select id from public.bank_statements
-        where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS'
+        where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS'
       );
     delete from public.bank_statements
-    where company_id = v_company and coalesce(notes, '') = 'SEED_CIFRA_REPORTS';
+    where company_id = v_company and coalesce(notes, '') = 'SEED_SIFRA_REPORTS';
   exception when undefined_table then
     null;
   end;
@@ -211,12 +211,12 @@ begin
   -- ---------------------------------------------------------------------------
   insert into public.partners (id, company_id, kind, person_type, rif, name, address, phone, email, is_withholding_agent, notes)
   values
-    (v_cli1, v_company, 'customer', 'juridica', 'J301112223', 'Comercial Los Andes CA', 'Mérida', '0274-1112233', 'compras@andes.ve', true, 'SEED_CIFRA_REPORTS'),
-    (v_cli2, v_company, 'customer', 'juridica', 'J304445556', 'Distribuidora Caribe SA', 'Valencia', '0241-4445556', 'cxc@caribe.ve', true, 'SEED_CIFRA_REPORTS'),
-    (v_prov1, v_company, 'supplier', 'juridica', 'J307778889', 'Suministros del Centro CA', 'Maracay', '0243-7778889', 'ventas@centro.ve', true, 'SEED_CIFRA_REPORTS'),
-    (v_prov2, v_company, 'supplier', 'natural', 'V123456789', 'Pedro Pérez Servicios', 'Caracas', '0414-1234567', 'pedro@mail.ve', false, 'SEED_CIFRA_REPORTS')
+    (v_cli1, v_company, 'customer', 'juridica', 'J301112223', 'Comercial Los Andes CA', 'Mérida', '0274-1112233', 'compras@andes.ve', true, 'SEED_SIFRA_REPORTS'),
+    (v_cli2, v_company, 'customer', 'juridica', 'J304445556', 'Distribuidora Caribe SA', 'Valencia', '0241-4445556', 'cxc@caribe.ve', true, 'SEED_SIFRA_REPORTS'),
+    (v_prov1, v_company, 'supplier', 'juridica', 'J307778889', 'Suministros del Centro CA', 'Maracay', '0243-7778889', 'ventas@centro.ve', true, 'SEED_SIFRA_REPORTS'),
+    (v_prov2, v_company, 'supplier', 'natural', 'V123456789', 'Pedro Pérez Servicios', 'Caracas', '0414-1234567', 'pedro@mail.ve', false, 'SEED_SIFRA_REPORTS')
   on conflict (company_id, rif) do update
-    set name = excluded.name, notes = 'SEED_CIFRA_REPORTS', kind = excluded.kind;
+    set name = excluded.name, notes = 'SEED_SIFRA_REPORTS', kind = excluded.kind;
 
   -- Re-resolve IDs if conflict updated existing rows
   select id into v_cli1 from public.partners where company_id = v_company and rif = 'J301112223';
@@ -244,14 +244,14 @@ begin
     'VES', v_rate,
     v_untaxed, v_tax, 0, v_total, v_ret,
     round(v_untaxed/v_rate,2), round(v_tax/v_rate,2), v_usd, round(v_residual/v_rate,2),
-    v_residual, 0, 'not_paid', 'SEED_CIFRA_REPORTS', v_user, false
+    v_residual, 0, 'not_paid', 'SEED_SIFRA_REPORTS', v_user, false
   );
 
   insert into public.invoice_lines (invoice_id, company_id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total)
   values (v_inv1, v_company, 'Servicio de consultoría', 1, v_untaxed, 16, v_untaxed, v_tax, v_total);
 
   insert into public.account_moves (company_id, journal_id, name, ref, move_date, state, partner_id, invoice_id, notes, created_by)
-  values (v_company, v_j_ven, 'VEN/FV-SEED-001', '00-00000001', current_date - 5, 'confirmed', v_cli1, v_inv1, 'SEED_CIFRA_REPORTS', v_user)
+  values (v_company, v_j_ven, 'VEN/FV-SEED-001', '00-00000001', current_date - 5, 'confirmed', v_cli1, v_inv1, 'SEED_SIFRA_REPORTS', v_user)
   returning id into v_mov;
 
   update public.invoices set account_move_id = v_mov where id = v_inv1;
@@ -277,13 +277,13 @@ begin
     'VES', v_rate,
     v_untaxed, v_tax, 0, v_total, v_ret,
     round(v_untaxed/v_rate,2), round(v_tax/v_rate,2), round(v_total/v_rate,2), round(v_residual/v_rate,2),
-    v_residual, 3000.00, 'partial', 'SEED_CIFRA_REPORTS', v_user, false
+    v_residual, 3000.00, 'partial', 'SEED_SIFRA_REPORTS', v_user, false
   );
   insert into public.invoice_lines (invoice_id, company_id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total)
   values (v_inv2, v_company, 'Venta mercadería', 10, 500, 16, v_untaxed, v_tax, v_total);
 
   insert into public.account_moves (company_id, journal_id, name, ref, move_date, state, partner_id, invoice_id, notes, created_by)
-  values (v_company, v_j_ven, 'VEN/FV-SEED-002', '00-00000002', current_date - 40, 'confirmed', v_cli2, v_inv2, 'SEED_CIFRA_REPORTS', v_user)
+  values (v_company, v_j_ven, 'VEN/FV-SEED-002', '00-00000002', current_date - 40, 'confirmed', v_cli2, v_inv2, 'SEED_SIFRA_REPORTS', v_user)
   returning id into v_mov;
   update public.invoices set account_move_id = v_mov where id = v_inv2;
   insert into public.account_move_lines (move_id, company_id, account_id, partner_id, name, debit, credit, amount_residual, invoice_id) values
@@ -307,12 +307,12 @@ begin
     'VES', v_rate,
     v_untaxed, v_tax, 0, v_total, 0,
     round(v_untaxed/v_rate,2), round(v_tax/v_rate,2), round(v_total/v_rate,2), round(v_residual/v_rate,2),
-    v_residual, 0, 'not_paid', 'SEED_CIFRA_REPORTS', v_user, false
+    v_residual, 0, 'not_paid', 'SEED_SIFRA_REPORTS', v_user, false
   );
   insert into public.invoice_lines (invoice_id, company_id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total)
   values (v_inv3, v_company, 'Soporte mensual atrasado', 1, v_untaxed, 16, v_untaxed, v_tax, v_total);
   insert into public.account_moves (company_id, journal_id, name, ref, move_date, state, partner_id, invoice_id, notes, created_by)
-  values (v_company, v_j_ven, 'VEN/FV-SEED-003', '00-00000003', current_date - 120, 'confirmed', v_cli1, v_inv3, 'SEED_CIFRA_REPORTS', v_user)
+  values (v_company, v_j_ven, 'VEN/FV-SEED-003', '00-00000003', current_date - 120, 'confirmed', v_cli1, v_inv3, 'SEED_SIFRA_REPORTS', v_user)
   returning id into v_mov;
   update public.invoices set account_move_id = v_mov where id = v_inv3;
   insert into public.account_move_lines (move_id, company_id, account_id, partner_id, name, debit, credit, amount_residual, invoice_id) values
@@ -336,12 +336,12 @@ begin
     'VES', v_rate,
     v_untaxed, v_tax, 0, v_total, v_ret,
     round(v_untaxed/v_rate,2), round(v_tax/v_rate,2), round(v_total/v_rate,2), round(v_residual/v_rate,2),
-    v_residual, 0, 'not_paid', 'SEED_CIFRA_REPORTS', v_user, false
+    v_residual, 0, 'not_paid', 'SEED_SIFRA_REPORTS', v_user, false
   );
   insert into public.invoice_lines (invoice_id, company_id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total)
   values (v_inv4, v_company, 'Compra insumos', 1, v_untaxed, 16, v_untaxed, v_tax, v_total);
   insert into public.account_moves (company_id, journal_id, name, ref, move_date, state, partner_id, invoice_id, notes, created_by)
-  values (v_company, v_j_com, 'COM/FC-SEED-001', '00-11110001', current_date - 12, 'confirmed', v_prov1, v_inv4, 'SEED_CIFRA_REPORTS', v_user)
+  values (v_company, v_j_com, 'COM/FC-SEED-001', '00-11110001', current_date - 12, 'confirmed', v_prov1, v_inv4, 'SEED_SIFRA_REPORTS', v_user)
   returning id into v_mov;
   update public.invoices set account_move_id = v_mov where id = v_inv4;
   insert into public.account_move_lines (move_id, company_id, account_id, partner_id, name, debit, credit, amount_residual, invoice_id) values
@@ -365,12 +365,12 @@ begin
     'VES', v_rate,
     v_untaxed, v_tax, 0, v_total, 0,
     round(v_untaxed/v_rate,2), round(v_tax/v_rate,2), round(v_total/v_rate,2), round(v_residual/v_rate,2),
-    v_residual, 2000.00, 'partial', 'SEED_CIFRA_REPORTS', v_user, false
+    v_residual, 2000.00, 'partial', 'SEED_SIFRA_REPORTS', v_user, false
   );
   insert into public.invoice_lines (invoice_id, company_id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total)
   values (v_inv5, v_company, 'Honorarios', 1, v_untaxed, 16, v_untaxed, v_tax, v_total);
   insert into public.account_moves (company_id, journal_id, name, ref, move_date, state, partner_id, invoice_id, notes, created_by)
-  values (v_company, v_j_com, 'COM/FC-SEED-002', '00-11110002', current_date - 50, 'confirmed', v_prov2, v_inv5, 'SEED_CIFRA_REPORTS', v_user)
+  values (v_company, v_j_com, 'COM/FC-SEED-002', '00-11110002', current_date - 50, 'confirmed', v_prov2, v_inv5, 'SEED_SIFRA_REPORTS', v_user)
   returning id into v_mov;
   update public.invoices set account_move_id = v_mov where id = v_inv5;
   insert into public.account_move_lines (move_id, company_id, account_id, partner_id, name, debit, credit, amount_residual, invoice_id) values
@@ -393,12 +393,12 @@ begin
     'VES', v_rate,
     v_untaxed, v_tax, 0, v_total, 0,
     round(v_untaxed/v_rate,2), round(v_tax/v_rate,2), round(v_total/v_rate,2), 0,
-    0, v_total, 'paid', 'SEED_CIFRA_REPORTS', v_user, false
+    0, v_total, 'paid', 'SEED_SIFRA_REPORTS', v_user, false
   );
   insert into public.invoice_lines (invoice_id, company_id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total)
   values (v_inv6, v_company, 'Licencia software', 1, v_untaxed, 16, v_untaxed, v_tax, v_total);
   insert into public.account_moves (company_id, journal_id, name, ref, move_date, state, partner_id, invoice_id, notes, created_by)
-  values (v_company, v_j_ven, 'VEN/FV-SEED-004', '00-00000004', current_date - 20, 'confirmed', v_cli2, v_inv6, 'SEED_CIFRA_REPORTS', v_user)
+  values (v_company, v_j_ven, 'VEN/FV-SEED-004', '00-00000004', current_date - 20, 'confirmed', v_cli2, v_inv6, 'SEED_SIFRA_REPORTS', v_user)
   returning id into v_mov;
   update public.invoices set account_move_id = v_mov where id = v_inv6;
   insert into public.account_move_lines (move_id, company_id, account_id, partner_id, name, debit, credit, amount_residual, invoice_id) values
@@ -414,14 +414,14 @@ begin
     amount, currency_code, exchange_rate, amount_usd, memo, reference, state, created_by
   ) values (
     v_pay1, v_company, v_cli2, v_j_ban, 'inbound', current_date - 15,
-    3000.00, 'VES', v_rate, round(3000/v_rate,2), 'SEED_CIFRA_REPORTS', 'TRF-IN-001', 'confirmed', v_user
+    3000.00, 'VES', v_rate, round(3000/v_rate,2), 'SEED_SIFRA_REPORTS', 'TRF-IN-001', 'confirmed', v_user
   );
 
   insert into public.payment_allocations (payment_id, company_id, invoice_id, amount)
   values (v_pay1, v_company, v_inv2, 3000.00);
 
   insert into public.account_moves (company_id, journal_id, name, ref, move_date, state, partner_id, payment_id, notes, created_by)
-  values (v_company, v_j_ban, 'PAY/SEED-IN-001', 'TRF-IN-001', current_date - 15, 'confirmed', v_cli2, v_pay1, 'SEED_CIFRA_REPORTS', v_user)
+  values (v_company, v_j_ban, 'PAY/SEED-IN-001', 'TRF-IN-001', current_date - 15, 'confirmed', v_cli2, v_pay1, 'SEED_SIFRA_REPORTS', v_user)
   returning id into v_mov;
   update public.payments set move_id = v_mov where id = v_pay1;
   insert into public.account_move_lines (move_id, company_id, account_id, partner_id, name, debit, credit, amount_residual) values
@@ -433,13 +433,13 @@ begin
     amount, currency_code, exchange_rate, amount_usd, memo, reference, state, created_by
   ) values (
     v_pay2, v_company, v_cli2, v_j_caj, 'inbound', current_date - 8,
-    1740.00, 'VES', v_rate, round(1740/v_rate,2), 'SEED_CIFRA_REPORTS', 'CASH-IN-004', 'confirmed', v_user
+    1740.00, 'VES', v_rate, round(1740/v_rate,2), 'SEED_SIFRA_REPORTS', 'CASH-IN-004', 'confirmed', v_user
   );
   insert into public.payment_allocations (payment_id, company_id, invoice_id, amount)
   values (v_pay2, v_company, v_inv6, 1740.00);
 
   insert into public.account_moves (company_id, journal_id, name, ref, move_date, state, partner_id, payment_id, notes, created_by)
-  values (v_company, v_j_caj, 'PAY/SEED-IN-002', 'CASH-IN-004', current_date - 8, 'confirmed', v_cli2, v_pay2, 'SEED_CIFRA_REPORTS', v_user)
+  values (v_company, v_j_caj, 'PAY/SEED-IN-002', 'CASH-IN-004', current_date - 8, 'confirmed', v_cli2, v_pay2, 'SEED_SIFRA_REPORTS', v_user)
   returning id into v_mov;
   update public.payments set move_id = v_mov where id = v_pay2;
   insert into public.account_move_lines (move_id, company_id, account_id, partner_id, name, debit, credit, amount_residual) values
@@ -452,13 +452,13 @@ begin
     amount, currency_code, exchange_rate, amount_usd, memo, reference, state, created_by
   ) values (
     v_pay3, v_company, v_prov2, v_j_ban, 'outbound', current_date - 18,
-    2000.00, 'VES', v_rate, round(2000/v_rate,2), 'SEED_CIFRA_REPORTS', 'TRF-OUT-002', 'confirmed', v_user
+    2000.00, 'VES', v_rate, round(2000/v_rate,2), 'SEED_SIFRA_REPORTS', 'TRF-OUT-002', 'confirmed', v_user
   );
   insert into public.payment_allocations (payment_id, company_id, invoice_id, amount)
   values (v_pay3, v_company, v_inv5, 2000.00);
 
   insert into public.account_moves (company_id, journal_id, name, ref, move_date, state, partner_id, payment_id, notes, created_by)
-  values (v_company, v_j_ban, 'PAY/SEED-OUT-001', 'TRF-OUT-002', current_date - 18, 'confirmed', v_prov2, v_pay3, 'SEED_CIFRA_REPORTS', v_user)
+  values (v_company, v_j_ban, 'PAY/SEED-OUT-001', 'TRF-OUT-002', current_date - 18, 'confirmed', v_prov2, v_pay3, 'SEED_SIFRA_REPORTS', v_user)
   returning id into v_mov;
   update public.payments set move_id = v_mov where id = v_pay3;
   insert into public.account_move_lines (move_id, company_id, account_id, partner_id, name, debit, credit, amount_residual) values
@@ -467,7 +467,7 @@ begin
 
   -- Asiento manual de ajuste (MISC) para mayor
   insert into public.account_moves (company_id, journal_id, name, ref, move_date, state, notes, created_by)
-  values (v_company, v_j_misc, 'ASI/SEED-AJUSTE-1', 'Apertura capital seed', current_date - 60, 'confirmed', 'SEED_CIFRA_REPORTS', v_user)
+  values (v_company, v_j_misc, 'ASI/SEED-AJUSTE-1', 'Apertura capital seed', current_date - 60, 'confirmed', 'SEED_SIFRA_REPORTS', v_user)
   returning id into v_mov;
   insert into public.account_move_lines (move_id, company_id, account_id, name, debit, credit, amount_residual)
   select v_mov, v_company, id, 'Caja apertura', 50000, 0, 0 from public.account_accounts where company_id = v_company and code = '1.1.01';
@@ -482,7 +482,7 @@ begin
     amount_untaxed, amount_tax, amount_withheld, notes, created_by
   ) values (
     v_wh_iva, v_company, v_cli1, 'SEED-RET-IVA-001', v_period, current_date - 4, 'confirmed',
-    10000.00, 1600.00, 1200.00, 'SEED_CIFRA_REPORTS', v_user
+    10000.00, 1600.00, 1200.00, 'SEED_SIFRA_REPORTS', v_user
   );
   insert into public.withholding_iva_lines (
     withholding_id, company_id, invoice_id, operation_type, doc_type,
@@ -499,7 +499,7 @@ begin
     amount_untaxed, amount_tax, amount_withheld, notes, created_by
   ) values (
     v_wh_iva2, v_company, v_prov1, 'SEED-RET-IVA-002', v_period, current_date - 10, 'confirmed',
-    8000.00, 1280.00, 960.00, 'SEED_CIFRA_REPORTS', v_user
+    8000.00, 1280.00, 960.00, 'SEED_SIFRA_REPORTS', v_user
   );
   insert into public.withholding_iva_lines (
     withholding_id, company_id, invoice_id, operation_type, doc_type,
@@ -520,7 +520,7 @@ begin
     v_book_sale, v_company,
     'SEED — Libro de Ventas',
     'sale', (current_date - 130), current_date,
-    'done', 'SEED_CIFRA_REPORTS', v_user
+    'done', 'SEED_SIFRA_REPORTS', v_user
   );
 
   insert into public.fiscal_book_lines (
@@ -537,7 +537,7 @@ begin
   from public.invoices i
   join public.partners p on p.id = i.partner_id
   where i.company_id = v_company
-    and i.notes = 'SEED_CIFRA_REPORTS'
+    and i.notes = 'SEED_SIFRA_REPORTS'
     and i.move_type in ('out_invoice', 'out_refund')
     and coalesce(i.sin_cred, false) = false;
 
@@ -547,7 +547,7 @@ begin
     v_book_pur, v_company,
     'SEED — Libro de Compras',
     'purchase', (current_date - 130), current_date,
-    'done', 'SEED_CIFRA_REPORTS', v_user
+    'done', 'SEED_SIFRA_REPORTS', v_user
   );
 
   insert into public.fiscal_book_lines (
@@ -564,7 +564,7 @@ begin
   from public.invoices i
   join public.partners p on p.id = i.partner_id
   where i.company_id = v_company
-    and i.notes = 'SEED_CIFRA_REPORTS'
+    and i.notes = 'SEED_SIFRA_REPORTS'
     and i.move_type in ('in_invoice', 'in_refund')
     and coalesce(i.sin_cred, false) = false;
 
@@ -577,7 +577,7 @@ begin
       balance_start, balance_end, currency_code, exchange_rate, state, notes, created_by
     ) values (
       v_stmt, v_company, v_j_ban, 'Extracto seed ' || to_char(current_date, 'YYYY-MM'),
-      current_date, 0, 1000, 'VES', v_rate, 'open', 'SEED_CIFRA_REPORTS', v_user
+      current_date, 0, 1000, 'VES', v_rate, 'open', 'SEED_SIFRA_REPORTS', v_user
     );
     insert into public.bank_statement_lines (
       statement_id, company_id, line_date, payment_ref, partner_name, amount, is_reconciled
@@ -602,7 +602,7 @@ begin
       'withholdings_iva', 2,
       'fiscal_books', 2,
       'rate', v_rate,
-      'message', 'Seed reportes Cifra'
+      'message', 'Seed reportes Sifra'
     )
   );
 
@@ -611,22 +611,22 @@ end $$;
 
 -- Resumen rápido
 select 'partners' as kind, count(*)::text as n
-from public.partners where notes = 'SEED_CIFRA_REPORTS'
+from public.partners where notes = 'SEED_SIFRA_REPORTS'
 union all
-select 'invoices', count(*)::text from public.invoices where notes = 'SEED_CIFRA_REPORTS'
+select 'invoices', count(*)::text from public.invoices where notes = 'SEED_SIFRA_REPORTS'
 union all
-select 'payments', count(*)::text from public.payments where memo = 'SEED_CIFRA_REPORTS'
+select 'payments', count(*)::text from public.payments where memo = 'SEED_SIFRA_REPORTS'
 union all
-select 'moves', count(*)::text from public.account_moves where notes = 'SEED_CIFRA_REPORTS'
+select 'moves', count(*)::text from public.account_moves where notes = 'SEED_SIFRA_REPORTS'
 union all
-select 'wh_iva', count(*)::text from public.withholding_iva where notes = 'SEED_CIFRA_REPORTS'
+select 'wh_iva', count(*)::text from public.withholding_iva where notes = 'SEED_SIFRA_REPORTS'
 union all
-select 'fiscal_books', count(*)::text from public.fiscal_books where notes = 'SEED_CIFRA_REPORTS'
+select 'fiscal_books', count(*)::text from public.fiscal_books where notes = 'SEED_SIFRA_REPORTS'
 union all
 select 'open_ar', coalesce(sum(amount_residual),0)::text
 from public.invoices
-where notes = 'SEED_CIFRA_REPORTS' and move_type in ('out_invoice','out_refund') and amount_residual > 0
+where notes = 'SEED_SIFRA_REPORTS' and move_type in ('out_invoice','out_refund') and amount_residual > 0
 union all
 select 'open_ap', coalesce(sum(amount_residual),0)::text
 from public.invoices
-where notes = 'SEED_CIFRA_REPORTS' and move_type in ('in_invoice','in_refund') and amount_residual > 0;
+where notes = 'SEED_SIFRA_REPORTS' and move_type in ('in_invoice','in_refund') and amount_residual > 0;

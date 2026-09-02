@@ -1,4 +1,4 @@
--- Cifra: RLS + Storage policies
+-- Sifra: RLS + Storage policies
 
 -- ---------------------------------------------------------------------------
 -- Enable RLS

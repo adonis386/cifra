@@ -88,7 +88,7 @@ export function PrintLetterhead({
 export function PrintFooter({ company }: { company: CompanyPrintProfile }) {
   const footer =
     company.print_footer?.trim() ||
-    `Emitido por Cifra · ${company.name} · ${company.rif}`;
+    `Emitido por Sifra · ${company.name} · ${company.rif}`;
 
   return (
     <div

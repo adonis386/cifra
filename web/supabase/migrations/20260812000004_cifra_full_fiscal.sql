@@ -1,4 +1,4 @@
--- Cifra full fiscal extras: UT + municipal tables + concept codes helpers
+-- Sifra full fiscal extras: UT + municipal tables + concept codes helpers
 
 create table if not exists public.tax_units (
   id uuid primary key default gen_random_uuid(),
