@@ -73,7 +73,7 @@ export function PrintLetterhead({
               style={{
                 marginTop: 8,
                 height: 3,
-                background: "#2563eb",
+                background: "#1d6de6",
                 width: "100%",
                 marginLeft: "auto",
               }}

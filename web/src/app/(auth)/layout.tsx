@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-logo";
 
 export default function AuthLayout({
   children,
@@ -11,12 +12,13 @@ export default function AuthLayout({
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 70% 50% at 15% 0%, rgba(37,99,235,0.10), transparent 55%), radial-gradient(ellipse 60% 40% at 90% 100%, rgba(37,99,235,0.06), transparent 50%)",
+            "radial-gradient(ellipse 70% 50% at 15% 0%, rgba(29,109,230,0.12), transparent 55%), radial-gradient(ellipse 60% 40% at 90% 100%, rgba(29,109,230,0.07), transparent 50%)",
         }}
       />
 
-      <div className="relative mb-8 text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-[var(--color-foreground)]">
+      <div className="relative mb-8 flex flex-col items-center text-center">
+        <BrandMark size={80} priority />
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-[var(--color-foreground)]">
           Sifra
         </h1>
         <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">

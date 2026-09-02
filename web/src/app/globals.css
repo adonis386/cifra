@@ -5,16 +5,16 @@
  * Acento IG: #2563EB. UI clara + sidebar slate.
  */
 :root {
-  --brand-accent: #2563eb;
-  --brand-accent-hover: #1d4ed8;
+  --brand-accent: #1d6de6;
+  --brand-accent-hover: #185bc4;
   --brand-accent-muted: #dbeafe;
 
-  --color-primary: #2563eb;
-  --color-primary-soft: #1d4ed8;
+  --color-primary: #1d6de6;
+  --color-primary-soft: #185bc4;
   --color-on-primary: #ffffff;
   --color-secondary: #1e293b;
-  --color-accent: #2563eb;
-  --color-accent-hover: #1d4ed8;
+  --color-accent: #1d6de6;
+  --color-accent-hover: #185bc4;
   --color-background: #f8fafc;
   --color-background-end: #eff6ff;
   --color-foreground: #0f172a;
@@ -22,7 +22,7 @@
   --color-muted-foreground: #64748b;
   --color-border: #e2e8f0;
   --color-destructive: #dc2626;
-  --color-ring: #2563eb;
+  --color-ring: #1d6de6;
   --color-surface: #ffffff;
   --color-success: #15803d;
 

@@ -14,6 +14,7 @@ import {
   Wallet,
   ScrollText,
 } from "lucide-react";
+import { BrandLockup } from "@/components/brand-logo";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { signOut } from "@/lib/actions/auth";
 import { Button } from "@/components/ui";
@@ -65,12 +66,9 @@ export function AppShell({
     <div className="flex min-h-screen text-[var(--color-foreground)]">
       <aside className="sifra-motion-soft sticky top-0 hidden h-screen w-[240px] shrink-0 flex-col bg-[var(--color-sidebar)] px-5 py-7 md:flex">
         <div className="mb-8 px-1">
-          <p className="text-[1.75rem] font-bold leading-none tracking-tight text-white">
-            Sifra
-          </p>
-          <p className="mt-1.5 text-xs text-[var(--color-sidebar-muted)]">
-            Contabilidad VE
-          </p>
+          <Link href="/app" className="block">
+            <BrandLockup inverted />
+          </Link>
         </div>
 
         <nav className="flex flex-1 flex-col gap-5 overflow-y-auto pb-4">
@@ -145,7 +143,7 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-4 border-b border-[var(--color-border)]/80 bg-white/70 px-4 py-3 backdrop-blur-md md:px-10">
           <div className="min-w-0 md:hidden">
-            <p className="text-lg font-bold tracking-tight">Sifra</p>
+            <BrandLockup compact />
           </div>
           <CompanySwitcher
             companies={companies}

@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   title: "Sifra — Contabilidad Venezuela",
   description: "Libros fiscales, retenciones y archivos SENIAT",
   applicationName: "Sifra",
+  icons: {
+    icon: "/brand/mark.png",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
