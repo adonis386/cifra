@@ -97,8 +97,9 @@ export function WithholdingHub({
           <form action={txtAction} className="space-y-3">
             <h3 className="font-semibold">Exportar TXT</h3>
             <p className="text-xs text-[var(--color-muted-foreground)]">
-              Elige el lapso de declaración (ej. 16/08 al 31/08). Se incluyen
-              comprobantes IVA cuya fecha caiga en ese rango.
+              Lapso de declaración (ej. 16/08 al 31/08). Incluye todas las facturas
+              con retención IVA cuya fecha registro caiga en el rango. Crea
+              comprobantes faltantes automáticamente.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>

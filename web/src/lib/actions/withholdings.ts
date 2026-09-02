@@ -8,11 +8,13 @@ import { applyIvaRetentionPct } from "@/lib/actions/invoices";
 import { assertPeriodOpen } from "@/lib/actions/periods";
 import {
   buildIvaTxt99035,
-  formatRif99035,
   formatVoucherNumber,
   seniatIvaWithheld,
   snapAlicuota,
 } from "@/lib/seniat/txt-iva";
+import {
+  buildIvaTxtLinesForRange,
+} from "@/lib/seniat/iva-export";
 
 export type ActionState = {
   error?: string;
@@ -201,7 +203,6 @@ export async function exportIvaTxt(
 
   const dateFrom = String(formData.get("date_from") || "").trim();
   const dateTo = String(formData.get("date_to") || "").trim();
-  // Compatibilidad: si solo mandan período mensual (AAAAMM / YYYY-MM)
   const periodRaw = String(formData.get("period") || "").replace("-", "");
 
   let from = dateFrom;
@@ -223,86 +224,34 @@ export async function exportIvaTxt(
   }
 
   const supabase = await createClient();
-  const { data: headers, error } = await supabase
-    .from("withholding_iva")
-    .select(
-      "voucher_number, period, voucher_date, partners(rif), withholding_iva_lines(*)",
-    )
-    .eq("company_id", company.id)
-    .gte("voucher_date", from)
-    .lte("voucher_date", to)
-    .neq("state", "cancelled")
-    .order("voucher_date");
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (error) return { error: error.message };
-  if (!headers?.length) {
-    return { error: `No hay retenciones IVA del ${from} al ${to}.` };
-  }
+  const built = await buildIvaTxtLinesForRange(
+    supabase,
+    company,
+    from,
+    to,
+    user?.id,
+  );
+  if (!built.ok) return { error: built.error };
 
-  const agentRif = formatRif99035(company.rif);
-  if (agentRif.length !== 10) {
-    return {
-      error: `El RIF de la empresa debe tener 10 caracteres para SENIAT (letra + 9 dígitos). Ahora: ${company.rif || "(vacío)"}.`,
-    };
-  }
+  const txt = buildIvaTxt99035(built.lines);
+  const extra =
+    built.created > 0
+      ? ` Se crearon ${built.created} comprobante(s) faltante(s).`
+      : "";
+  const dedup =
+    built.skippedDedup > 0
+      ? ` (${built.skippedDedup} duplicada(s) omitida(s) por SENIAT.)`
+      : "";
 
-  const lines = [];
-  for (const wh of headers) {
-    const partner = wh.partners as unknown as
-      | { rif: string }
-      | { rif: string }[]
-      | null;
-    const p = Array.isArray(partner) ? partner[0] : partner;
-    const whLines = (wh.withholding_iva_lines || []) as Array<{
-      operation_type: "C" | "V";
-      doc_type: string;
-      invoice_number: string;
-      control_number: string;
-      affected_document: string;
-      invoice_date: string;
-      amount_total: number;
-      amount_untaxed: number;
-      amount_withheld: number;
-      amount_exempt: number;
-      alicuota: number;
-      expediente: string;
-    }>;
+  revalidatePath("/app/withholdings");
+  revalidatePath("/app/invoices");
 
-    for (const line of whLines) {
-      const base = Number(line.amount_untaxed || 0);
-      const ali = Number(line.alicuota || 16);
-      const stored = Number(line.amount_withheld || 0);
-      const partnerRif = formatRif99035(p?.rif || "");
-      if (partnerRif.length !== 10) {
-        return {
-          error: `RIF del proveedor/cliente inválido para SENIAT (debe ser letra + 9 dígitos, ej. J123456789). Factura ${line.invoice_number}: ${p?.rif || "(vacío)"}. Corrígelo en Terceros.`,
-        };
-      }
-      lines.push({
-        agentRif,
-        period: wh.period || periodFromDate(wh.voucher_date),
-        invoiceDate: line.invoice_date || wh.voucher_date,
-        operationType: line.operation_type,
-        docType: line.doc_type,
-        partnerRif,
-        invoiceNumber: line.invoice_number,
-        controlNumber: line.control_number || "0",
-        amountTotal: Number(line.amount_total),
-        amountUntaxed: base,
-        amountWithheld: stored,
-        affectedDocument: line.affected_document || "0",
-        voucherNumber: wh.voucher_number,
-        amountExempt: Number(line.amount_exempt || 0),
-        alicuota: ali,
-        expediente: line.expediente || "0",
-        retentionPct: 75,
-      });
-    }
-  }
-
-  const txt = buildIvaTxt99035(lines);
   return {
-    success: `TXT ${from} → ${to}: ${lines.length} línea(s).`,
+    success: `TXT ${from} → ${to}: ${built.lines.length} línea(s).${extra}${dedup}`,
     txt,
     date_from: from,
     date_to: to,

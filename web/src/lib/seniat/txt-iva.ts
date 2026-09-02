@@ -129,8 +129,16 @@ export function buildIvaTxt99035(lines: IvaTxtLine[]) {
       const base = Number(l.amountUntaxed || 0);
       const exempt = Number(l.amountExempt || 0);
       const iva = seniatIvaAmount(base, ali);
-      const withheld = seniatIvaWithheld(base, ali, pct);
-      const total = Number((base + iva + exempt).toFixed(2));
+      const storedWithheld = Number(l.amountWithheld);
+      const withheld =
+        storedWithheld > 0
+          ? storedWithheld
+          : seniatIvaWithheld(base, ali, pct);
+      const storedTotal = Number(l.amountTotal);
+      const total =
+        storedTotal > 0
+          ? storedTotal
+          : Number((base + iva + exempt).toFixed(2));
       return [
         formatRif99035(l.agentRif),
         l.period,
