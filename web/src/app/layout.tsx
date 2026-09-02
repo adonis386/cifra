@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cifra — Contabilidad Venezuela",
+  title: "Sifra — Contabilidad Venezuela",
   description: "Libros fiscales, retenciones y archivos SENIAT",
-  applicationName: "Cifra",
+  applicationName: "Sifra",
 };
 
 export default function RootLayout({

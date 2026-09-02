@@ -1,4 +1,4 @@
--- Cifra: dual currency (USD/Bs), fiscal VE fields, ISLR on lines, control sequences
+-- Sifra: dual currency (USD/Bs), fiscal VE fields, ISLR on lines, control sequences
 
 -- ---------------------------------------------------------------------------
 -- Exchange rates (BCV / tasa del día) — Bs por 1 USD

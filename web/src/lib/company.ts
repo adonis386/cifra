@@ -10,7 +10,7 @@ export type Company = {
   dual_currency?: boolean;
 };
 
-export const ACTIVE_COMPANY_COOKIE = "cifra_active_company";
+export const ACTIVE_COMPANY_COOKIE = "sifra_active_company";
 
 export function normalizeRif(rif: string) {
   // Quita guiones, puntos, espacios y cualquier separador. Guarda V123456789.

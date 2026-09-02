@@ -1,5 +1,5 @@
 -- =============================================================================
--- Cifra: WIPE datos de negocio — conservar auth.users
+-- Sifra: WIPE datos de negocio — conservar auth.users
 -- =============================================================================
 -- Qué hace:
 --   • Borra TODAS las empresas, facturas, retenciones, libros, asientos, etc.

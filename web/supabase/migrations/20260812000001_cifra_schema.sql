@@ -1,4 +1,4 @@
--- Cifra: schema inicial (multi-empresa + fiscal VE)
+-- Sifra: schema inicial (multi-empresa + fiscal VE)
 -- Run in Supabase SQL Editor or via supabase db push
 
 create extension if not exists "pgcrypto";

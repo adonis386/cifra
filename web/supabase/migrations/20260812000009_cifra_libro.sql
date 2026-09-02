@@ -1,4 +1,4 @@
--- Cifra Libro: extractos caja/banco, conciliación y metadatos de asientos
+-- Sifra Libro: extractos caja/banco, conciliación y metadatos de asientos
 
 -- ---------------------------------------------------------------------------
 -- Move line reconciliation (partida doble usable)
@@ -15,7 +15,7 @@ create index if not exists idx_move_lines_unreconciled
 
 -- ---------------------------------------------------------------------------
 -- Bank / cash statements (extractos) — no es el "diario" de Odoo;
--- es la conciliación de caja y bancos de Cifra.
+-- es la conciliación de caja y bancos de Sifra.
 -- ---------------------------------------------------------------------------
 do $$ begin
   create type public.statement_state as enum ('open', 'confirming', 'done');

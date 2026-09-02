@@ -1,4 +1,4 @@
--- Cifra accounting core (Odoo-inspired): chart, journals, moves, payments, residuals
+-- Sifra accounting core (Odoo-inspired): chart, journals, moves, payments, residuals
 
 -- Payment / residual enums
 do $$ begin

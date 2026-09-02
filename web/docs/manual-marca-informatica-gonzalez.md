@@ -1,7 +1,7 @@
 # Manual de marca — Informática González
 **Uso:** pasá este documento completo a un agente IA como contexto de marca antes de diseñar, redactar, maquetar o adaptar un proyecto.
 
-> **Aplicación en Cifra:** producto independiente. Solo se toman los **colores de acento** (`#2563EB` / hover / muted) y un crédito discreto “Desarrollado por Informática González”. UI clara por defecto; sin tipografías Tektur/Inter de marca ni chrome oscuro (sidebar, auth).
+> **Aplicación en Sifra:** producto independiente. Solo se toman los **colores de acento** (`#2563EB` / hover / muted) y un crédito discreto “Desarrollado por Informática González”. UI clara por defecto; sin tipografías Tektur/Inter de marca ni chrome oscuro (sidebar, auth).
 
 **Web:** https://informaticagonzalez.com  
 **Instagram:** @informatica.gonzalez  

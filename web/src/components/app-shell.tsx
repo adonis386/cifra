@@ -63,10 +63,10 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen text-[var(--color-foreground)]">
-      <aside className="cifra-motion-soft sticky top-0 hidden h-screen w-[240px] shrink-0 flex-col bg-[var(--color-sidebar)] px-5 py-7 md:flex">
+      <aside className="sifra-motion-soft sticky top-0 hidden h-screen w-[240px] shrink-0 flex-col bg-[var(--color-sidebar)] px-5 py-7 md:flex">
         <div className="mb-8 px-1">
           <p className="text-[1.75rem] font-bold leading-none tracking-tight text-white">
-            Cifra
+            Sifra
           </p>
           <p className="mt-1.5 text-xs text-[var(--color-sidebar-muted)]">
             Contabilidad VE
@@ -145,7 +145,7 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-4 border-b border-[var(--color-border)]/80 bg-white/70 px-4 py-3 backdrop-blur-md md:px-10">
           <div className="min-w-0 md:hidden">
-            <p className="text-lg font-bold tracking-tight">Cifra</p>
+            <p className="text-lg font-bold tracking-tight">Sifra</p>
           </div>
           <CompanySwitcher
             companies={companies}
@@ -156,7 +156,7 @@ export function AppShell({
           </span>
         </header>
 
-        <main className="cifra-motion-in flex-1 px-4 py-6 pb-24 md:px-10 md:py-8 md:pb-10">
+        <main className="sifra-motion-in flex-1 px-4 py-6 pb-24 md:px-10 md:py-8 md:pb-10">
           {children}
         </main>
       </div>

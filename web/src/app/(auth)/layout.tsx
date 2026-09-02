@@ -17,7 +17,7 @@ export default function AuthLayout({
 
       <div className="relative mb-8 text-center">
         <h1 className="text-3xl font-bold tracking-tight text-[var(--color-foreground)]">
-          Cifra
+          Sifra
         </h1>
         <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
           Contabilidad VE

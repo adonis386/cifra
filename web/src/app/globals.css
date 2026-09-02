@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Cifra — look de prueba (pen.dev mock).
+ * Sifra — look de prueba (pen.dev mock).
  * Acento IG: #2563EB. UI clara + sidebar slate.
  */
 :root {
@@ -80,7 +80,7 @@ button,
   cursor: pointer;
 }
 
-@keyframes cifra-fade-up {
+@keyframes sifra-fade-up {
   from {
     opacity: 0;
     transform: translateY(8px);
@@ -91,7 +91,7 @@ button,
   }
 }
 
-@keyframes cifra-fade-in {
+@keyframes sifra-fade-in {
   from {
     opacity: 0;
   }
@@ -100,14 +100,14 @@ button,
   }
 }
 
-.cifra-motion-in {
-  animation: cifra-fade-up 420ms ease-out both;
+.sifra-motion-in {
+  animation: sifra-fade-up 420ms ease-out both;
 }
 
-.cifra-motion-in-delay {
-  animation: cifra-fade-up 480ms ease-out 80ms both;
+.sifra-motion-in-delay {
+  animation: sifra-fade-up 480ms ease-out 80ms both;
 }
 
-.cifra-motion-soft {
-  animation: cifra-fade-in 360ms ease-out both;
+.sifra-motion-soft {
+  animation: sifra-fade-in 360ms ease-out both;
 }

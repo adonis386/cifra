@@ -179,7 +179,7 @@ export function BrandingForm({ company }: { company: CompanyBranding }) {
             <Input
               id="print_footer"
               name="print_footer"
-              placeholder="Ej: Documento generado por Cifra · confidencial"
+              placeholder="Ej: Documento generado por Sifra · confidencial"
               defaultValue={company.print_footer || ""}
             />
           </div>

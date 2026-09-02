@@ -87,7 +87,7 @@ export function Dialog({
       className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="cifra-dialog-title"
+      aria-labelledby="sifra-dialog-title"
     >
       <button
         type="button"
@@ -103,7 +103,7 @@ export function Dialog({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h2
-              id="cifra-dialog-title"
+              id="sifra-dialog-title"
               className="text-lg font-semibold tracking-tight"
             >
               {title}
