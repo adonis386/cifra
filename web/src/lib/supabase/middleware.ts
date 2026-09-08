@@ -1,6 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const PUBLIC_AUTH_PREFIXES = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/verify-email",
+];
+
+function startsWithAny(path: string, prefixes: string[]) {
+  return prefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -36,23 +47,43 @@ export async function updateSession(request: NextRequest) {
   const isAuthenticated = Boolean(data?.claims);
 
   const path = request.nextUrl.pathname;
-  const isAuthRoute =
-    path.startsWith("/login") || path.startsWith("/signup");
+  const isPublicAuth = startsWithAny(path, PUBLIC_AUTH_PREFIXES);
+  const isMfaRoute = path === "/mfa" || path.startsWith("/mfa/");
+  const isResetRoute = path === "/reset-password" || path.startsWith("/reset-password/");
+  const isAuthCallback = path.startsWith("/auth/");
   const isAppRoute = path.startsWith("/app");
   const isPrintRoute = path.startsWith("/print");
   const isExportRoute = path.startsWith("/api/export");
 
-  if (!isAuthenticated && (isAppRoute || isPrintRoute || isExportRoute)) {
+  if (!isAuthenticated && (isAppRoute || isPrintRoute || isExportRoute || isMfaRoute)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path);
     return NextResponse.redirect(url);
   }
 
-  if (isAuthenticated && isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/app";
-    return NextResponse.redirect(url);
+  if (isAuthenticated && !isAuthCallback) {
+    const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const needsMfa =
+      aal.data?.nextLevel === "aal2" && aal.data.currentLevel !== "aal2";
+
+    if (needsMfa && !isMfaRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/mfa";
+      url.searchParams.set("next", path.startsWith("/app") ? path : "/app");
+      return NextResponse.redirect(url);
+    }
+
+    if (!needsMfa && isPublicAuth) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/app";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  if (!isAuthenticated && isResetRoute) {
+    return supabaseResponse;
   }
 
   return supabaseResponse;

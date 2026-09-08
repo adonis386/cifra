@@ -1,9 +1,9 @@
-import { LoginForm } from "@/components/auth/login-form";
+import { OtpLoginForm } from "@/components/auth/otp-login-form";
 
-export default async function LoginPage({
+export default async function OtpLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string }>;
 }) {
   const params = await searchParams;
   const nextPath = params.next?.startsWith("/") ? params.next : "/app";
@@ -11,12 +11,12 @@ export default async function LoginPage({
   return (
     <div>
       <h2 className="mb-1 text-xl font-semibold text-[var(--color-foreground)]">
-        Entrar
+        Entrar con código
       </h2>
       <p className="mb-6 text-sm text-[var(--color-muted-foreground)]">
-        Accede a tus libros y retenciones.
+        Te enviamos un código de un solo uso al correo. No crea cuentas nuevas.
       </p>
-      <LoginForm nextPath={nextPath} banner={params.error} />
+      <OtpLoginForm nextPath={nextPath} />
     </div>
   );
 }

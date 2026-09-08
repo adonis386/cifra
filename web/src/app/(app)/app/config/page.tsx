@@ -3,6 +3,7 @@ import { BrandingForm } from "@/components/config/branding-form";
 import { ConfigForms } from "@/components/config/config-forms";
 import { SequenceConfigForm } from "@/components/config/sequence-config-form";
 import { PeriodCloseForm } from "@/components/config/period-close-form";
+import { SecuritySettings } from "@/components/config/security-settings";
 import { getCompanyPrintProfile } from "@/lib/company-print";
 import {
   formatMoney,
@@ -117,6 +118,13 @@ export default async function ConfigPage() {
         ) : (
           <EmptyState title="Sin datos de empresa" />
         )}
+      </SectionCard>
+
+      <SectionCard
+        title="Seguridad de la cuenta"
+        description="Doble factor opcional y vinculación de Google o Apple."
+      >
+        <SecuritySettings />
       </SectionCard>
 
       <SectionCard
