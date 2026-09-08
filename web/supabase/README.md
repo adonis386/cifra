@@ -26,7 +26,7 @@ Para **borrar todos los datos de negocio** y dejar solo usuarios de Authenticati
 1. SQL Editor → pega `migrations/WIPE_KEEP_AUTH.sql` → **Run**
 2. En Sifra: crea de nuevo la empresa y carga datos
 
-No borra `auth.users`. Sí limpia empresas, facturas, retenciones, libros, asientos y logos; recrea `profiles` y catálogos globales (IVA / UT).
+No borra `auth.users`. Sí limpia empresas, facturas, retenciones, libros, asientos y logos; recrea `profiles` y catálogos globales (IVA / UT / ISLR).
 
 ## Tablas
 
