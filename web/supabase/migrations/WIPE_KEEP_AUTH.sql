@@ -102,14 +102,14 @@ select c.id, 'juridica', r.rate, 0, r.code, 100, r.minimum_ut
 from public.islr_concepts c
 join (values
   ('001', '001', 5::numeric, 0::numeric),
-  ('002', '002', 2::numeric, 0.33::numeric),
-  ('003', '003', 3::numeric, 0.33::numeric),
-  ('004', '004', 5::numeric, 0.33::numeric),
-  ('005', '005', 3::numeric, 0.33::numeric),
-  ('006', '006', 5::numeric, 0.33::numeric),
-  ('007', '007', 5::numeric, 0.33::numeric),
-  ('008', '008', 5::numeric, 0.33::numeric),
-  ('009', '009', 5::numeric, 0.33::numeric),
+  ('002', '002', 2::numeric, 0::numeric),
+  ('003', '003', 3::numeric, 0::numeric),
+  ('004', '004', 5::numeric, 0::numeric),
+  ('005', '005', 3::numeric, 0::numeric),
+  ('006', '006', 5::numeric, 0::numeric),
+  ('007', '007', 5::numeric, 0::numeric),
+  ('008', '008', 5::numeric, 0::numeric),
+  ('009', '009', 5::numeric, 0::numeric),
   ('010', '010', 5::numeric, 0::numeric)
 ) as r(concept_code, code, rate, minimum_ut) on c.code = r.concept_code
 where c.company_id is null;
