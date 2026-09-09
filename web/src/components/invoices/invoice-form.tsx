@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createInvoice, type ActionState } from "@/lib/actions/invoices";
 import { nextControlNumber } from "@/lib/actions/rates";
 import { islrRateLabel } from "@/lib/seniat/islr-calc";
-import { calcIslrFromTabla } from "@/lib/seniat/islr-catalog";
+import { calcIslrFromTabla, seniatRateFor } from "@/lib/seniat/islr-catalog";
 import { Button, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
 
@@ -114,18 +114,20 @@ function dual(bs: number, rate: number) {
 export function InvoiceForm({
   partners,
   islrConcepts = [],
-  islrRates = [],
+  islrRates: _islrRates = [],
   products = [],
   initialRate = 0,
   taxUnitAmount = 0,
 }: {
   partners: Partner[];
   islrConcepts?: IslrConcept[];
+  /** @deprecated Rates come from SENIAT tabla via concept code mapping. */
   islrRates?: IslrRate[];
   products?: Product[];
   initialRate?: number;
   taxUnitAmount?: number;
 }) {
+  void _islrRates;
   const [state, action, pending] = useActionState(createInvoice, initial);
   const router = useRouter();
   const [ctrlPending, startCtrl] = useTransition();
@@ -158,14 +160,6 @@ export function InvoiceForm({
     resolvedPartner?.person_type === "natural" ? "natural" : "juridica";
   const rateNum = Number(exchangeRate || 0);
 
-  function rateForConcept(conceptId: string) {
-    if (!conceptId) return null;
-    return (
-      islrRates.find(
-        (r) => r.concept_id === conceptId && r.person_type === partnerPersonType,
-      ) || islrRates.find((r) => r.concept_id === conceptId) || null
-    );
-  }
   const showImport = moveType.startsWith("in_");
 
   if (state.success && state.success !== resetToken) {
@@ -200,24 +194,22 @@ export function InvoiceForm({
       tax += l.tax;
       exempt += l.exempt;
       if (!l.line.conceptId) continue;
-      const rate =
-        islrRates.find(
-          (r) =>
-            r.concept_id === l.line.conceptId &&
-            r.person_type === partnerPersonType,
-        ) || islrRates.find((r) => r.concept_id === l.line.conceptId);
-      if (!rate) continue;
+      const conceptCode = islrConcepts.find(
+        (c) => c.id === l.line.conceptId,
+      )?.code;
+      if (!conceptCode || conceptCode === "000") continue;
+      const tabla = seniatRateFor(conceptCode, partnerPersonType);
+      if (!tabla?.withholdable && Number(tabla?.rate || 0) <= 0) continue;
       const calc = calcIslrFromTabla({
         base: Number(l.untaxed || l.exempt || 0),
-        conceptCode: islrConcepts.find((c) => c.id === l.line.conceptId)?.code,
+        conceptCode,
         personType: partnerPersonType,
         utAmount: taxUnitAmount,
       });
       retainedIslr += calc.withheld;
       const label = islrRateLabel({
-        rate: Number(rate.rate || 0),
-        minimum_ut: Number(rate.minimum_ut || 0),
-        subtract_ut: Number(rate.subtract_ut || 0),
+        rate: Number(tabla?.rate || 0),
+        minimum_ut: Number(tabla?.minimum_ut || 0),
       });
       if (!islrParts.includes(label)) islrParts.push(label);
     }
@@ -237,7 +229,6 @@ export function InvoiceForm({
     computedLines,
     withholdingPct,
     islrConcepts,
-    islrRates,
     partnerPersonType,
     taxUnitAmount,
   ]);
@@ -673,13 +664,17 @@ export function InvoiceForm({
                     {islrConcepts
                       .filter((c) => {
                         if (!c.code || c.code === "000") return true;
-                        const r = rateForConcept(c.id);
-                        if (!r) return false;
-                        return r.person_type === partnerPersonType;
+                        const tabla = seniatRateFor(c.code, partnerPersonType);
+                        return Boolean(tabla?.withholdable);
                       })
                       .map((c) => {
-                      const r = rateForConcept(c.id);
-                      const extra = r ? ` (${islrRateLabel(r)})` : "";
+                      const tabla = seniatRateFor(c.code, partnerPersonType);
+                      const extra = tabla
+                        ? ` (${islrRateLabel({
+                            rate: Number(tabla.rate || 0),
+                            minimum_ut: Number(tabla.minimum_ut || 0),
+                          })})`
+                        : "";
                       return (
                         <option key={c.id} value={c.id}>
                           {c.code} — {c.name}
