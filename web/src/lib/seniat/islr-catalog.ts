@@ -43,8 +43,11 @@ export function seniatXmlCode(
 ) {
   const code = String(conceptCode || "000").replace(/\D/g, "").padStart(3, "0");
   const person = personType === "natural" ? "natural" : "juridica";
-  if (ISLR_TABLA.some((r) => r.code === code)) return code;
-  return LEGACY_XML[`${code}:${person}`] || code;
+  // Catálogo corto de la app (001 honorarios, 002 contratistas, …) choca con
+  // códigos SENIAT distintos (002 = honorarios PN). Siempre mapear primero.
+  const mapped = LEGACY_XML[`${code}:${person}`];
+  if (mapped) return mapped;
+  return code;
 }
 
 export function seniatConceptLabel(
