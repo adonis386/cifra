@@ -17,9 +17,9 @@ export type IslrCalcResult = {
 };
 
 /**
- * Retención = (base × %) − sustraendo.
- * Sustraendo (honorarios PN) = UT × (% / 100) × 83.3334
- * según la contadora y la tabla SENIAT.
+ * Retención = (base × base% × alícuota%) − sustraendo.
+ * Sustraendo (PN residente, cuando aplica) = UT × (% / 100) × 83.3334
+ * Fuente: tabla ISLR UT 43 (G.O. 43.140) — p.ej. honorarios 3% → 107,50 Bs.
  */
 export function calcIslrWithholding(input: IslrCalcInput): IslrCalcResult {
   const rate = Number(input.rate || 0);

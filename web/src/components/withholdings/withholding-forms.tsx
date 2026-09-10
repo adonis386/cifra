@@ -153,7 +153,8 @@ export function WithholdingHub({
           <form action={islrAction} className="space-y-3">
             <h3 className="font-semibold">Comprobante ISLR</h3>
             <p className="text-xs text-[var(--color-muted-foreground)]">
-              El cálculo sale de la factura (concepto, alícuota y sustraendo UT × % × 83.3334).
+              El cálculo usa la tabla ISLR UT 43 (Decreto 1.808): alícuota y sustraendo
+              UT × % × 83.3334 cuando aplica (p.ej. honorarios PN 107,50 Bs).
               No se vuelve a elegir tarifa a mano.
             </p>
             <div>
