@@ -233,7 +233,7 @@ export async function generateFiscalBook(
     taxLines = (rawLines || []) as LineTax[];
   }
 
-  // Comprobantes IVA vinculados
+  // Comprobantes IVA vinculados (solo confirmados; ignora anulados)
   const voucherByInvoice = new Map<
     string,
     { voucher_number: string; voucher_date: string }
@@ -241,12 +241,15 @@ export async function generateFiscalBook(
   if (ids.length) {
     const { data: whLines } = await supabase
       .from("withholding_iva_lines")
-      .select("invoice_id, withholding_id, withholding_iva(voucher_number, voucher_date)")
-      .in("invoice_id", ids);
+      .select(
+        "invoice_id, withholding_id, withholding_iva!inner(voucher_number, voucher_date, state)",
+      )
+      .in("invoice_id", ids)
+      .eq("withholding_iva.state", "confirmed");
     for (const row of whLines || []) {
       const wh = row.withholding_iva as unknown as
-        | { voucher_number: string; voucher_date: string }
-        | { voucher_number: string; voucher_date: string }[]
+        | { voucher_number: string; voucher_date: string; state?: string }
+        | { voucher_number: string; voucher_date: string; state?: string }[]
         | null;
       const w = Array.isArray(wh) ? wh[0] : wh;
       if (row.invoice_id && w?.voucher_number) {
