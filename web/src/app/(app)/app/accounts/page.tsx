@@ -201,7 +201,14 @@ export default async function AccountsPage() {
                 return (
                   <tr key={m.id}>
                     <Td>{m.move_date}</Td>
-                    <Td className="font-mono text-xs">{m.name}</Td>
+                    <Td className="font-mono text-xs">
+                      <Link
+                        href={`/app/entries/${m.id}`}
+                        className="font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+                      >
+                        {m.name}
+                      </Link>
+                    </Td>
                     <Td>{p?.name || "—"}</Td>
                     <Td className="text-xs">{m.ref || "—"}</Td>
                   </tr>

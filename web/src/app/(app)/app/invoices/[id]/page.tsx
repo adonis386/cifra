@@ -47,6 +47,7 @@ export default async function InvoiceDetailPage({
        invoice_number, control_number, affected_document, currency_code, exchange_rate,
        amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva,
        amount_retained_islr, amount_paid, amount_residual, payment_state, notes, sin_cred,
+       account_move_id,
        partners(name, rif, address, phone, person_type),
        invoice_lines(id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total)`,
     )
@@ -150,6 +151,14 @@ export default async function InvoiceDetailPage({
             >
               Imprimir
             </Link>
+            {inv.account_move_id ? (
+              <Link
+                href={`/app/entries/${inv.account_move_id}`}
+                className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-sm font-semibold hover:border-[var(--color-primary)]"
+              >
+                Ver asiento
+              </Link>
+            ) : null}
             {ivaWh?.id && ivaWh.state !== "cancelled" ? (
               <Link
                 href={`/print/iva/${ivaWh.id}`}
