@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, type TdHTMLAttributes, type ThHTMLAttributes } from "react";
 
 export function PageHeader({
   eyebrow,
@@ -119,14 +119,32 @@ export function DataTable({ children }: { children: ReactNode }) {
   );
 }
 
-export function Th({ children, className = "" }: { children?: ReactNode; className?: string }) {
+export function Th({
+  children,
+  className = "",
+  ...props
+}: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <th className={`bg-[var(--color-muted)] px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)] ${className}`}>
+    <th
+      className={`bg-[var(--color-muted)] px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)] ${className}`}
+      {...props}
+    >
       {children}
     </th>
   );
 }
 
-export function Td({ children, className = "" }: { children?: ReactNode; className?: string }) {
-  return <td className={`border-t border-[var(--color-border)] px-4 py-3 align-middle ${className}`}>{children}</td>;
+export function Td({
+  children,
+  className = "",
+  ...props
+}: TdHTMLAttributes<HTMLTableCellElement>) {
+  return (
+    <td
+      className={`border-t border-[var(--color-border)] px-4 py-3 align-middle ${className}`}
+      {...props}
+    >
+      {children}
+    </td>
+  );
 }
