@@ -71,12 +71,20 @@ function splitAliquots(
 
   const invLines = lines.filter((l) => l.invoice_id === inv.id);
   if (invLines.length) {
+    // Recalcular exento solo desde líneas (alícuota 0). Si también usamos
+    // inv.amount_exempt de cabecera, las ventas/compras 100% exentas quedan
+    // duplicadas en el libro (p.ej. 105600 → 211200).
+    split.amount_exempt = 0;
+    let sawExemptLine = false;
     for (const l of invLines) {
       const rate = Number(l.tax_rate || 0);
       const base = Number(l.amount_untaxed || 0);
       const tax = Number(l.amount_tax || 0);
       if (rate <= 0 || (base <= 0 && tax <= 0)) {
-        if (base > 0) split.amount_exempt += base;
+        if (base > 0 && tax <= 0) {
+          split.amount_exempt += base;
+          sawExemptLine = true;
+        }
         continue;
       }
       if (Math.abs(rate - 8) < 0.01) {
@@ -92,6 +100,9 @@ function splitAliquots(
         split.tax_general += tax;
         split.rate_general = rate || 16;
       }
+    }
+    if (!sawExemptLine && Number(inv.amount_exempt || 0) > 0) {
+      split.amount_exempt = Number(inv.amount_exempt || 0);
     }
   } else {
     // Fallback cabecera: todo a general si hay IVA
