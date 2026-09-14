@@ -151,6 +151,14 @@ export default async function InvoiceDetailPage({
             >
               Imprimir
             </Link>
+            {inv.account_move_id ? (
+              <Link
+                href={`/app/entries/${inv.account_move_id}`}
+                className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-sm font-semibold hover:border-[var(--color-primary)]"
+              >
+                Ver asiento
+              </Link>
+            ) : null}
             {ivaWh?.id && ivaWh.state !== "cancelled" ? (
               <Link
                 href={`/print/iva/${ivaWh.id}`}
