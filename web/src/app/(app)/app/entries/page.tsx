@@ -90,6 +90,7 @@ export default async function EntriesPage() {
                 <Th>Tercero</Th>
                 <Th>Ref</Th>
                 <Th>Estado</Th>
+                <Th></Th>
               </tr>
             </thead>
             <tbody>
@@ -107,7 +108,14 @@ export default async function EntriesPage() {
                 return (
                   <tr key={m.id}>
                     <Td className="whitespace-nowrap">{m.move_date}</Td>
-                    <Td className="font-mono text-xs">{m.name}</Td>
+                    <Td className="font-mono text-xs">
+                      <Link
+                        href={`/app/entries/${m.id}`}
+                        className="font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+                      >
+                        {m.name}
+                      </Link>
+                    </Td>
                     <Td className="text-xs">
                       {j ? `${j.code}` : "—"}
                     </Td>
@@ -119,6 +127,14 @@ export default async function EntriesPage() {
                       <Badge tone={m.state === "posted" || m.state === "confirmed" || m.state === "done" ? "success" : "primary"}>
                         {m.state}
                       </Badge>
+                    </Td>
+                    <Td>
+                      <Link
+                        href={`/app/entries/${m.id}`}
+                        className="text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+                      >
+                        Ver
+                      </Link>
                     </Td>
                   </tr>
                 );

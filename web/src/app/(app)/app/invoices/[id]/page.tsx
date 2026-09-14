@@ -47,6 +47,7 @@ export default async function InvoiceDetailPage({
        invoice_number, control_number, affected_document, currency_code, exchange_rate,
        amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva,
        amount_retained_islr, amount_paid, amount_residual, payment_state, notes, sin_cred,
+       account_move_id,
        partners(name, rif, address, phone, person_type),
        invoice_lines(id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total)`,
     )
