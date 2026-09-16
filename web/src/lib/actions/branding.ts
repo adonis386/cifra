@@ -144,6 +144,7 @@ export async function updateCompanyBranding(
       );
       revalidatePath("/app/config");
       revalidatePath("/print", "layout");
+      revalidatePath("/app", "layout");
       return {
         success:
           "Datos guardados. Aplica migraciones 11 y 12 para membrete completo y logos públicos.",

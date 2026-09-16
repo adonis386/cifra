@@ -19,7 +19,12 @@ import { CompanySwitcher } from "@/components/company-switcher";
 import { signOut } from "@/lib/actions/auth";
 import { Button } from "@/components/ui";
 
-type Company = { id: string; name: string; rif: string };
+type Company = {
+  id: string;
+  name: string;
+  rif: string;
+  logo_url?: string | null;
+};
 
 const groups = [
   {
@@ -141,17 +146,17 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between gap-4 border-b border-[var(--color-border)]/80 bg-white/70 px-4 py-3 backdrop-blur-md md:px-10">
-          <div className="min-w-0 md:hidden">
+        <header className="sticky top-0 z-30 flex min-h-14 items-center gap-3 border-b border-[var(--color-border)] bg-white/90 px-4 pb-2 backdrop-blur-md md:px-10 pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <div className="min-w-0 shrink-0 md:hidden">
             <BrandLockup compact />
           </div>
-          <CompanySwitcher
-            companies={companies}
-            activeCompanyId={activeCompanyId || active?.id}
-          />
-          <span className="hidden max-w-[180px] truncate text-xs text-[var(--color-muted-foreground)] sm:inline">
-            {email}
-          </span>
+          <div className="ml-auto min-w-0">
+            <CompanySwitcher
+              companies={companies}
+              activeCompanyId={activeCompanyId || active?.id}
+              email={email}
+            />
+          </div>
         </header>
 
         <main className="sifra-motion-in flex-1 px-4 py-6 pb-24 md:px-10 md:py-8 md:pb-10">

@@ -20,7 +20,13 @@ export type IvaTxtLine = {
   retentionPct?: number;
 };
 
-const ALIQUOTS = [8, 16, 31];
+import {
+  snapAlicuota,
+  seniatIvaAmount,
+  seniatIvaWithheld,
+} from "@/domain/seniat/iva";
+
+export { snapAlicuota, seniatIvaAmount, seniatIvaWithheld };
 
 /** RIF SENIAT: exactamente 10 caracteres, letra + 9 dígitos, sin guiones. */
 export function formatRif99035(rif: string) {
@@ -30,42 +36,6 @@ export function formatRif99035(rif: string) {
   const m = clean.match(/^([VEJPGC])(\d{1,9})$/);
   if (!m) return clean.slice(0, 10);
   return `${m[1]}${m[2].padStart(9, "0")}`;
-}
-
-export function snapAlicuota(rate: number) {
-  const n = Number(rate || 0);
-  if (n <= 0) return 16;
-  return ALIQUOTS.reduce((best, x) =>
-    Math.abs(x - n) < Math.abs(best - n) ? x : best,
-  );
-}
-
-/** IVA = base × alícuota / 100, 2 decimales. */
-export function seniatIvaAmount(base: number, alicuota: number) {
-  return Number(
-    ((Math.abs(Number(base) || 0) * Math.abs(Number(alicuota) || 0)) / 100).toFixed(
-      2,
-    ),
-  );
-}
-
-/**
- * SENIAT: IVA retenido = base × alícuota × % retención / 10000.
- * En compras el % típico es 75.
- */
-export function seniatIvaWithheld(
-  base: number,
-  alicuota: number,
-  retentionPct = 75,
-) {
-  return Number(
-    (
-      (Math.abs(Number(base) || 0) *
-        Math.abs(Number(alicuota) || 0) *
-        Math.abs(Number(retentionPct) || 0)) /
-      10000
-    ).toFixed(2),
-  );
 }
 
 function num(n: number) {

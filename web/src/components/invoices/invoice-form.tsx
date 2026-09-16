@@ -9,6 +9,7 @@ import { islrRateLabel } from "@/lib/seniat/islr-calc";
 import { calcIslrFromTabla, seniatRateFor } from "@/lib/seniat/islr-catalog";
 import { Button, FieldError, Input, Label } from "@/components/ui";
 import { Select } from "@/components/layout";
+import { invoiceDomain } from "@/domain/invoices/invoice.service";
 
 const initial: ActionState = {};
 
@@ -67,35 +68,12 @@ function emptyLine(id = "1"): Line {
 }
 
 function lineAmounts(line: Line) {
-  const quantity = Number(line.quantity || 0);
-  const priceUnit = Number(line.priceUnit || 0);
-  const base = Number((quantity * priceUnit).toFixed(2));
   const tax = TAX_OPTIONS.find((t) => t.code === line.taxCode) || TAX_OPTIONS[0];
-  if (tax.isExempt || tax.rate === 0) {
-    return {
-      quantity,
-      priceUnit,
-      base,
-      rate: 0,
-      untaxed: 0,
-      tax: 0,
-      exempt: base,
-      subtotal: base,
-      isExempt: true,
-    };
-  }
-  const iva = Number(((base * tax.rate) / 100).toFixed(2));
-  return {
-    quantity,
-    priceUnit,
-    base,
-    rate: tax.rate,
-    untaxed: base,
-    tax: iva,
-    exempt: 0,
-    subtotal: Number((base + iva).toFixed(2)),
-    isExempt: false,
-  };
+  return invoiceDomain.lineFromQtyPriceRate(
+    Number(line.quantity || 0),
+    Number(line.priceUnit || 0),
+    tax.isExempt ? 0 : tax.rate,
+  );
 }
 
 function money(n: number) {

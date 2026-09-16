@@ -1,5 +1,14 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { toUsd as toUsdDomain, toBs as toBsDomain } from "@/domain/money";
+import { publicLogoUrl } from "@/lib/company-print";
+
+export {
+  normalizeRif,
+  validateRif,
+  normalizeEmail,
+  validateEmailOptional,
+} from "@/domain/identity";
 
 export type Company = {
   id: string;
@@ -8,68 +17,11 @@ export type Company = {
   is_withholding_agent?: boolean;
   currency_code?: string;
   dual_currency?: boolean;
+  logo_path?: string | null;
+  logo_url?: string | null;
 };
 
 export const ACTIVE_COMPANY_COOKIE = "sifra_active_company";
-
-export function normalizeRif(rif: string) {
-  // Quita guiones, puntos, espacios y cualquier separador. Guarda V123456789.
-  return rif.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-}
-
-/** Valida RIF/cédula VE. Natural: V/E. Jurídica: J/G/C/P.
- *  Sin personType acepta cualquiera (empresa puede ser firma personal con V/E). */
-export function validateRif(
-  rifRaw: string,
-  personType?: "natural" | "juridica" | "any" | string,
-): { ok: true; rif: string } | { ok: false; error: string } {
-  const rif = normalizeRif(rifRaw);
-  if (!rif) {
-    return {
-      ok: false,
-      error:
-        personType === "natural"
-          ? "Indica la cédula/RIF. Ej: V-12345678-9"
-          : "Indica el RIF. Ej: V-12345678-9 o J-12345678-9",
-    };
-  }
-  if (!/^[VEJPGC]\d{6,9}$/.test(rif)) {
-    return {
-      ok: false,
-      error:
-        "Formato inválido. Usa V/E (natural) o J/G/C/P (jurídica). Ej: V-12345678-9",
-    };
-  }
-  if (personType === "natural" && !/^[VE]/.test(rif)) {
-    return {
-      ok: false,
-      error: "Persona natural debe empezar con V o E (cédula). Ej: V-12345678-9",
-    };
-  }
-  if (personType === "juridica" && !/^[JGCP]/.test(rif)) {
-    return {
-      ok: false,
-      error: "Persona jurídica debe empezar con J, G, C o P. Ej: J-12345678-9",
-    };
-  }
-  return { ok: true, rif };
-}
-
-/** Quita espacios y normaliza correo (evita gmail .com del teclado). */
-export function normalizeEmail(email: string) {
-  return email.replace(/\s+/g, "").trim().toLowerCase();
-}
-
-export function validateEmailOptional(
-  emailRaw: string,
-): { ok: true; email: string | null } | { ok: false; error: string } {
-  const email = normalizeEmail(emailRaw);
-  if (!email) return { ok: true, email: null };
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { ok: false, error: "Correo inválido. Ej: nombre@gmail.com (sin espacios)" };
-  }
-  return { ok: true, email };
-}
 
 export function formatMoney(n: number | string | null | undefined) {
   const value = Number(n || 0);
@@ -79,19 +31,8 @@ export function formatMoney(n: number | string | null | undefined) {
   }).format(value);
 }
 
-/** Bs → USD usando tasa (Bs por 1 USD). */
-export function toUsd(amountBs: number, rate: number | null | undefined) {
-  const r = Number(rate || 0);
-  if (!r) return null;
-  return Number((Number(amountBs || 0) / r).toFixed(2));
-}
-
-/** USD → Bs. */
-export function toBs(amountUsd: number, rate: number | null | undefined) {
-  const r = Number(rate || 0);
-  if (!r) return null;
-  return Number((Number(amountUsd || 0) * r).toFixed(2));
-}
+export const toUsd = toUsdDomain;
+export const toBs = toBsDomain;
 
 /** Formato dual estilo Odoo VE: `$ 1.234,56 / 45.678,90 Bs` */
 export function formatDual(
@@ -131,11 +72,21 @@ export async function setActiveCompanyCookie(companyId: string) {
   });
 }
 
-function unwrapCompany(raw: unknown): Company | null {
+type CompanyRow = Company & { updated_at?: string | null };
+
+function unwrapCompany(raw: unknown): CompanyRow | null {
   if (!raw) return null;
   const c = Array.isArray(raw) ? raw[0] : raw;
   if (!c || typeof c !== "object" || !("id" in c)) return null;
-  return c as Company;
+  return c as CompanyRow;
+}
+
+function withLogoUrl(company: CompanyRow): Company {
+  const { updated_at: cacheKey, ...rest } = company;
+  return {
+    ...rest,
+    logo_url: publicLogoUrl(company.logo_path, cacheKey),
+  };
 }
 
 /** Todas las empresas del usuario (membresías). */
@@ -145,21 +96,29 @@ export async function getUserCompanies(): Promise<Company[]> {
   const full = await supabase
     .from("company_members")
     .select(
-      "created_at, companies(id, name, rif, is_withholding_agent, currency_code, dual_currency)",
+      "created_at, companies(id, name, rif, is_withholding_agent, currency_code, dual_currency, logo_path, updated_at)",
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: true });
 
   let rows: { companies?: unknown }[] | null = full.data;
-  if (
-    full.error &&
-    /currency_code|dual_currency|column|created_at/i.test(full.error.message)
-  ) {
-    const fallback = await supabase
+  if (full.error) {
+    const mid = await supabase
       .from("company_members")
-      .select("companies(id, name, rif, is_withholding_agent)")
-      .eq("user_id", user.id);
-    rows = fallback.data;
+      .select(
+        "created_at, companies(id, name, rif, is_withholding_agent, currency_code, dual_currency)",
+      )
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+    if (!mid.error) {
+      rows = mid.data;
+    } else {
+      const fallback = await supabase
+        .from("company_members")
+        .select("companies(id, name, rif, is_withholding_agent)")
+        .eq("user_id", user.id);
+      rows = fallback.data;
+    }
   }
 
   const companies: Company[] = [];
@@ -168,7 +127,7 @@ export async function getUserCompanies(): Promise<Company[]> {
     const c = unwrapCompany(row.companies);
     if (c && !seen.has(c.id)) {
       seen.add(c.id);
-      companies.push(c);
+      companies.push(withLogoUrl(c));
     }
   }
   return companies;

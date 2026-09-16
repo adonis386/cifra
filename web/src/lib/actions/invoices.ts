@@ -1,36 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getActiveCompany, periodFromDate, toUsd, getActiveTaxUnit } from "@/lib/company";
+import { getActiveCompany, getActiveTaxUnit } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
-import { seniatIvaWithheld, snapAlicuota } from "@/lib/seniat/txt-iva";
 import { calcIslrFromTabla } from "@/lib/seniat/islr-catalog";
-import { sameInvoiceNumber } from "@/lib/invoice-number";
-import { assertPeriodOpen } from "@/lib/actions/periods";
+import { seniatIvaAmount } from "@/domain/seniat/iva";
+import { invoiceDomain } from "@/domain/invoices/invoice.service";
+import type { InvoiceLineInput } from "@/domain/invoices/invoice.types";
+import { InvoicesRepository } from "@/repositories/invoices.repository";
+import { PeriodsRepository } from "@/repositories/periods.repository";
 
 export type ActionState = { error?: string; success?: string; id?: string };
-
-function moveMeta(moveType: string) {
-  if (moveType === "out_invoice") return { operation: "V" as const, doc: "01" };
-  if (moveType === "out_refund") return { operation: "V" as const, doc: "03" };
-  if (moveType === "in_invoice") return { operation: "C" as const, doc: "01" };
-  if (moveType === "in_refund") return { operation: "C" as const, doc: "03" };
-  return { operation: "C" as const, doc: "01" };
-}
-
-type ParsedLine = {
-  description: string;
-  quantity?: number;
-  price_unit?: number;
-  rate: number;
-  base?: number;
-  untaxed?: number;
-  tax?: number;
-  exempt?: number;
-  total?: number;
-  tax_code?: string;
-  concept_id?: string | null;
-};
 
 export async function createInvoice(
   _prev: ActionState,
@@ -39,180 +19,87 @@ export async function createInvoice(
   const company = await getActiveCompany();
   if (!company) return { error: "Crea una empresa primero." };
 
-  const partnerId = String(formData.get("partner_id") || "");
-  const moveType = String(formData.get("move_type") || "in_invoice");
+  let parsedLines: InvoiceLineInput[] = [];
+  try {
+    parsedLines = JSON.parse(String(formData.get("lines_json") || "[]"));
+  } catch {
+    parsedLines = [];
+  }
+
   const invoiceDate = String(formData.get("invoice_date") || "");
-  const registrationDate =
-    String(formData.get("registration_date") || "").trim() || invoiceDate;
-  const invoiceNumber = String(formData.get("invoice_number") || "").trim();
-  const controlNumber = String(formData.get("control_number") || "").trim();
-  const affectedDocument = String(formData.get("affected_document") || "").trim();
-  const currencyCode = String(formData.get("currency_code") || "VES").toUpperCase();
-  const exchangeRate = Number(formData.get("exchange_rate") || 0) || null;
-  const sinCred = String(formData.get("sin_cred") || "0") === "1";
-  const importPlanilla = String(formData.get("import_planilla") || "").trim();
-  const importFileNumber = String(formData.get("import_file_number") || "").trim();
-  const importDate = String(formData.get("import_date") || "").trim() || null;
-  const amountUntaxed = Number(formData.get("amount_untaxed") || 0);
-  const taxRate = Number(formData.get("tax_rate") || 16);
-  const amountExempt = Number(formData.get("amount_exempt") || 0);
-  const withholdingPct = Number(formData.get("withholding_pct") || 0);
+  const input = {
+    partnerId: String(formData.get("partner_id") || ""),
+    moveType: String(formData.get("move_type") || "in_invoice"),
+    invoiceDate,
+    registrationDate:
+      String(formData.get("registration_date") || "").trim() || invoiceDate,
+    invoiceNumber: String(formData.get("invoice_number") || "").trim(),
+    controlNumber: String(formData.get("control_number") || "").trim(),
+    currencyCode: String(formData.get("currency_code") || "VES").toUpperCase(),
+    exchangeRate: Number(formData.get("exchange_rate") || 0) || null,
+    sinCred: String(formData.get("sin_cred") || "0") === "1",
+    importPlanilla: String(formData.get("import_planilla") || "").trim(),
+    importFileNumber: String(formData.get("import_file_number") || "").trim(),
+    amountUntaxed: Number(formData.get("amount_untaxed") || 0),
+    taxRate: Number(formData.get("tax_rate") || 16),
+    amountExempt: Number(formData.get("amount_exempt") || 0),
+    withholdingPct: Number(formData.get("withholding_pct") || 0),
+    igtfRate: Number(formData.get("igtf_rate") || 0) || 0,
+    lines: parsedLines,
+  };
 
-  if (!partnerId || !invoiceDate || !invoiceNumber) {
-    return { error: "Completa tercero, fecha y número de factura." };
-  }
-  if (!controlNumber && moveType.startsWith("in_") && !sinCred) {
-    return { error: "El número de control es obligatorio en compras (crédito fiscal)." };
-  }
-  if (currencyCode === "USD" && !(exchangeRate && exchangeRate > 0)) {
-    return { error: "Con moneda USD indica la tasa del día (Bs por 1 USD)." };
-  }
+  const invalid = invoiceDomain.validateCreate(input);
+  if (invalid) return { error: invalid };
 
-  const periodCheck = await assertPeriodOpen(company.id, invoiceDate);
+  const supabase = await createClient();
+  const periods = new PeriodsRepository(supabase);
+  const invoices = new InvoicesRepository(supabase);
+
+  const periodCheck = await periods.assertOpen(company.id, input.invoiceDate);
   if (!periodCheck.ok) return { error: periodCheck.error };
-  if (registrationDate !== invoiceDate) {
-    const regCheck = await assertPeriodOpen(company.id, registrationDate);
+  if (input.registrationDate !== input.invoiceDate) {
+    const regCheck = await periods.assertOpen(company.id, input.registrationDate);
     if (!regCheck.ok) return { error: regCheck.error };
   }
 
-  const supabase = await createClient();
-
-  // Evita duplicados: 146 y 000146 son el mismo número
-  const normalizedNumber = invoiceNumber.trim();
-  const { data: dupes } = await supabase
-    .from("invoices")
-    .select("id, invoice_date, invoice_number")
-    .eq("company_id", company.id)
-    .eq("partner_id", partnerId)
-    .eq("move_type", moveType)
-    .neq("state", "cancelled")
-    .limit(500);
-
-  const dup = (dupes || []).find((d) =>
-    sameInvoiceNumber(String(d.invoice_number || ""), normalizedNumber),
-  );
+  const normalizedNumber = input.invoiceNumber.trim();
+  const dup = await invoices.findDuplicate({
+    companyId: company.id,
+    partnerId: input.partnerId,
+    moveType: input.moveType,
+    invoiceNumber: normalizedNumber,
+  });
   if (dup) {
     return {
       error: `Ya existe la factura ${dup.invoice_number} para este proveedor/cliente (${dup.invoice_date}). No se puede registrar duplicada (146 y 000146 son el mismo número).`,
     };
   }
 
-  const amountTax = Number(((amountUntaxed * taxRate) / 100).toFixed(2));
-  const meta = moveMeta(moveType);
-  let doc = meta.doc;
-  const operation = meta.operation;
-  if (importPlanilla || importFileNumber) {
-    doc = "04"; // importación / otros
-  }
+  const factor = invoiceDomain.vesFactor(input.currencyCode, input.exchangeRate);
+  const lines = invoiceDomain.normalizeLines(
+    invoiceDomain.fallbackLines(
+      input.lines,
+      input.amountUntaxed,
+      input.amountExempt,
+      input.taxRate,
+    ),
+    factor,
+  );
+  const amountTax = seniatIvaAmount(input.amountUntaxed, input.taxRate);
 
-  let parsedLines: ParsedLine[] = [];
-  try {
-    parsedLines = JSON.parse(String(formData.get("lines_json") || "[]"));
-  } catch {
-    parsedLines = [];
-  }
-  if (!parsedLines.length) {
-    parsedLines = [
-      {
-        description: "Línea principal",
-        quantity: 1,
-        price_unit: amountUntaxed || amountExempt,
-        rate: taxRate,
-        untaxed: amountUntaxed,
-        tax: amountTax,
-        exempt: amountExempt,
-        base: amountUntaxed || amountExempt,
-      },
-    ];
-  }
-
-  const factor =
-    currencyCode === "USD" && exchangeRate && exchangeRate > 0 ? exchangeRate : 1;
-
-  const normalized = parsedLines.map((l) => {
-    const quantity = Number(l.quantity ?? 1) || 0;
-    let priceUnit = Number(
-      l.price_unit ??
-        (quantity ? Number(l.base || 0) / quantity : Number(l.base || 0)),
-    );
-    // Convert USD unit prices to Bs for storage (company books in VES)
-    if (factor !== 1) {
-      priceUnit = Number((priceUnit * factor).toFixed(4));
-    }
-    const rate = Number(l.rate || 0);
-    const gross = Number((quantity * priceUnit).toFixed(2));
-    const hasExplicit = l.untaxed != null || l.tax != null || l.exempt != null;
-    let untaxed = hasExplicit ? Number(l.untaxed || 0) : rate > 0 ? gross : 0;
-    let tax = hasExplicit
-      ? Number(l.tax || 0)
-      : Number(((untaxed * rate) / 100).toFixed(2));
-    let exempt = hasExplicit ? Number(l.exempt || 0) : rate > 0 ? 0 : gross;
-    if (factor !== 1 && hasExplicit) {
-      untaxed = Number((untaxed * factor).toFixed(2));
-      tax = Number((tax * factor).toFixed(2));
-      exempt = Number((exempt * factor).toFixed(2));
-    }
-    return {
-      description: l.description || "Línea",
-      quantity,
-      price_unit: priceUnit,
-      rate,
-      untaxed,
-      tax,
-      exempt,
-      total: Number((untaxed + tax + exempt).toFixed(2)),
-      concept_id: l.concept_id || null,
-    };
-  });
-
-  const linesUntaxed = normalized.reduce((s, l) => s + l.untaxed, 0);
-  const linesTax = normalized.reduce((s, l) => s + l.tax, 0);
-  const linesExempt = normalized.reduce((s, l) => s + l.exempt, 0);
-  const finalUntaxed = Number((linesUntaxed || amountUntaxed * factor).toFixed(2));
-  const finalTax = Number((linesTax || amountTax * factor).toFixed(2));
-  const finalExempt = Number((linesExempt || amountExempt * factor).toFixed(2));
-  const finalTotal = Number((finalUntaxed + finalTax + finalExempt).toFixed(2));
-  const effectiveWithholdingPct = finalTax > 0 ? withholdingPct : 0;
-  const finalRetained = Number(((finalTax * effectiveWithholdingPct) / 100).toFixed(2));
-
-  const rateForUsd =
-    exchangeRate && exchangeRate > 0
-      ? exchangeRate
-      : currencyCode === "USD"
-        ? factor
-        : null;
-  const usdUntaxed = toUsd(finalUntaxed, rateForUsd);
-  const usdTax = toUsd(finalTax, rateForUsd);
-  const usdExempt = toUsd(finalExempt, rateForUsd);
-  const usdTotal = toUsd(finalTotal, rateForUsd);
-  const residual = Number((finalTotal - finalRetained).toFixed(2));
-  const usdResidual = toUsd(residual, rateForUsd);
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Retención ISLR estimada según conceptos en líneas
-  let finalRetainedIslr = 0;
+  let retainedIslr = 0;
   const conceptIds = [
-    ...new Set(normalized.map((l) => l.concept_id).filter(Boolean) as string[]),
+    ...new Set(lines.map((l) => l.concept_id).filter(Boolean) as string[]),
   ];
   if (conceptIds.length) {
     const [{ data: partner }, { data: conceptRows }, utAmount] = await Promise.all([
-      supabase
-        .from("partners")
-        .select("person_type")
-        .eq("id", partnerId)
-        .maybeSingle(),
-      supabase
-        .from("islr_concepts")
-        .select("id, code")
-        .in("id", conceptIds),
+      supabase.from("partners").select("person_type").eq("id", input.partnerId).maybeSingle(),
+      supabase.from("islr_concepts").select("id, code").in("id", conceptIds),
       getActiveTaxUnit(company.id, invoiceDate),
     ]);
     const personType = partner?.person_type === "natural" ? "natural" : "juridica";
     const codeById = new Map((conceptRows || []).map((c) => [c.id, c.code]));
-    for (const line of normalized) {
+    for (const line of lines) {
       if (!line.concept_id) continue;
       const calc = calcIslrFromTabla({
         base: Number(line.untaxed || line.exempt || 0),
@@ -220,60 +107,79 @@ export async function createInvoice(
         personType,
         utAmount,
       });
-      finalRetainedIslr += calc.withheld;
+      retainedIslr += calc.withheld;
     }
-    finalRetainedIslr = Number(finalRetainedIslr.toFixed(2));
+    retainedIslr = Number(retainedIslr.toFixed(2));
   }
 
-  const residualWithIslr = Number(
-    (finalTotal - finalRetained - finalRetainedIslr).toFixed(2),
+  const totals = invoiceDomain.totals({
+    lines,
+    amountUntaxed: input.amountUntaxed,
+    amountTax,
+    amountExempt: input.amountExempt,
+    withholdingPct: input.withholdingPct,
+    retainedIslr,
+    igtfRate: input.igtfRate,
+    factor,
+  });
+  const rateForUsd =
+    input.exchangeRate && input.exchangeRate > 0
+      ? input.exchangeRate
+      : input.currencyCode === "USD"
+        ? factor
+        : null;
+  const usd = invoiceDomain.usdAmounts(totals, rateForUsd);
+  const { operation, doc } = invoiceDomain.docType(
+    input.moveType,
+    input.importPlanilla,
+    input.importFileNumber,
   );
+  const importDate = String(formData.get("import_date") || "").trim() || null;
+  const affectedDocument = String(formData.get("affected_document") || "").trim();
 
-  const igtfRate = Number(formData.get("igtf_rate") || 0) || 0;
-  const amountIgtf =
-    igtfRate > 0 ? Number(((finalTotal * igtfRate) / 100).toFixed(2)) : 0;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { data: invoice, error } = await supabase
-    .from("invoices")
-    .insert({
-      company_id: company.id,
-      partner_id: partnerId,
-      move_type: moveType,
-      operation_type: operation,
-      doc_type: doc,
-      state: "confirmed",
-      invoice_date: invoiceDate,
-      registration_date: registrationDate,
-      due_date: invoiceDate,
-      invoice_number: normalizedNumber,
-      control_number: controlNumber || null,
-      affected_document: affectedDocument || null,
-      import_file_number: importFileNumber || null,
-      import_planilla: importPlanilla || null,
-      import_date: importDate,
-      sin_cred: sinCred,
-      currency_code: currencyCode === "USD" ? "USD" : "VES",
-      exchange_rate: rateForUsd,
-      amount_untaxed: finalUntaxed,
-      amount_tax: finalTax,
-      amount_exempt: finalExempt,
-      amount_total: finalTotal,
-      amount_retained_iva: finalRetained,
-      amount_retained_islr: finalRetainedIslr,
-      igtf_rate: igtfRate,
-      amount_igtf: amountIgtf,
-      amount_untaxed_usd: usdUntaxed,
-      amount_tax_usd: usdTax,
-      amount_exempt_usd: usdExempt,
-      amount_total_usd: usdTotal,
-      amount_residual: residualWithIslr,
-      amount_residual_usd: toUsd(residualWithIslr, rateForUsd),
-      amount_paid: 0,
-      payment_state: residualWithIslr <= 0 ? "paid" : "not_paid",
-      created_by: user?.id,
-    })
-    .select("id")
-    .single();
+  const row = {
+    company_id: company.id,
+    partner_id: input.partnerId,
+    move_type: input.moveType,
+    operation_type: operation,
+    doc_type: doc,
+    state: "confirmed",
+    invoice_date: input.invoiceDate,
+    registration_date: input.registrationDate,
+    due_date: input.invoiceDate,
+    invoice_number: normalizedNumber,
+    control_number: input.controlNumber || null,
+    affected_document: affectedDocument || null,
+    import_file_number: input.importFileNumber || null,
+    import_planilla: input.importPlanilla || null,
+    import_date: importDate,
+    sin_cred: input.sinCred,
+    currency_code: input.currencyCode === "USD" ? "USD" : "VES",
+    exchange_rate: rateForUsd,
+    amount_untaxed: totals.untaxed,
+    amount_tax: totals.tax,
+    amount_exempt: totals.exempt,
+    amount_total: totals.total,
+    amount_retained_iva: totals.retainedIva,
+    amount_retained_islr: totals.retainedIslr,
+    igtf_rate: input.igtfRate,
+    amount_igtf: totals.igtf,
+    amount_untaxed_usd: usd.untaxed,
+    amount_tax_usd: usd.tax,
+    amount_exempt_usd: usd.exempt,
+    amount_total_usd: usd.total,
+    amount_residual: totals.residual,
+    amount_residual_usd: usd.residual,
+    amount_paid: 0,
+    payment_state: totals.residual <= 0 ? "paid" : "not_paid",
+    created_by: user?.id,
+  };
+
+  const { data: invoice, error } = await invoices.insert(row);
 
   if (error) {
     if (/duplicate|unique|23505/i.test(error.message)) {
@@ -281,36 +187,31 @@ export async function createInvoice(
         error: `Ya existe la factura ${normalizedNumber} para este tercero. No se puede registrar duplicada.`,
       };
     }
-    // Soft fallback if migration not applied yet
     if (/column|does not exist|schema cache/i.test(error.message)) {
-      const { data: legacy, error: legacyErr } = await supabase
-        .from("invoices")
-        .insert({
-          company_id: company.id,
-          partner_id: partnerId,
-          move_type: moveType,
-          operation_type: operation,
-          doc_type: doc,
-          state: "confirmed",
-          invoice_date: invoiceDate,
-          due_date: invoiceDate,
-          invoice_number: normalizedNumber,
-          control_number: controlNumber || null,
-          affected_document: affectedDocument || null,
-          import_file_number: importFileNumber || null,
-          currency_code: currencyCode === "USD" ? "USD" : "VES",
-          amount_untaxed: finalUntaxed,
-          amount_tax: finalTax,
-          amount_exempt: finalExempt,
-          amount_total: finalTotal,
-          amount_retained_iva: finalRetained,
-          amount_residual: residual,
-          amount_paid: 0,
-          payment_state: residual <= 0 ? "paid" : "not_paid",
-          created_by: user?.id,
-        })
-        .select("id")
-        .single();
+      const { data: legacy, error: legacyErr } = await invoices.insert({
+        company_id: company.id,
+        partner_id: input.partnerId,
+        move_type: input.moveType,
+        operation_type: operation,
+        doc_type: doc,
+        state: "confirmed",
+        invoice_date: input.invoiceDate,
+        due_date: input.invoiceDate,
+        invoice_number: normalizedNumber,
+        control_number: input.controlNumber || null,
+        affected_document: affectedDocument || null,
+        import_file_number: input.importFileNumber || null,
+        currency_code: input.currencyCode === "USD" ? "USD" : "VES",
+        amount_untaxed: totals.untaxed,
+        amount_tax: totals.tax,
+        amount_exempt: totals.exempt,
+        amount_total: totals.total,
+        amount_retained_iva: totals.retainedIva,
+        amount_residual: Number((totals.total - totals.retainedIva).toFixed(2)),
+        amount_paid: 0,
+        payment_state: totals.residual <= 0 ? "paid" : "not_paid",
+        created_by: user?.id,
+      });
       if (legacyErr) {
         if (/duplicate|unique|23505/i.test(legacyErr.message)) {
           return {
@@ -319,36 +220,31 @@ export async function createInvoice(
         }
         return { error: legacyErr.message };
       }
-      await insertLines(supabase, legacy.id, company.id, normalized, false);
+      await invoices.insertLines(legacy.id, company.id, lines, false);
       await tryPostAccounting(legacy.id);
       revalidateAll(legacy.id);
-      return {
-        success: `Factura registrada · ${legacy.id}`,
-        id: legacy.id,
-      };
+      return { success: `Factura registrada · ${legacy.id}`, id: legacy.id };
     }
     return { error: error.message };
   }
 
-  const lineErr = await insertLines(supabase, invoice.id, company.id, normalized, true);
+  const lineErr = await invoices.insertLines(invoice.id, company.id, lines, true);
   if (lineErr) return { error: lineErr };
 
   await tryPostAccounting(invoice.id);
-  if (finalRetained > 0) {
+  if (totals.retainedIva > 0) {
     try {
-      const { ensureIvaWithholdingForInvoice } = await import(
-        "@/lib/actions/withholdings"
-      );
+      const { ensureIvaWithholdingForInvoice } = await import("@/lib/actions/withholdings");
       await ensureIvaWithholdingForInvoice(
         invoice.id,
-        effectiveWithholdingPct,
-        invoiceDate,
+        totals.withholdingPct,
+        input.invoiceDate,
       );
     } catch {
       /* comprobante IVA se puede generar en Retenciones */
     }
   }
-  if (finalRetainedIslr > 0) {
+  if (totals.retainedIslr > 0) {
     try {
       const { ensureIslrWithholdingForInvoice } = await import("@/lib/actions/islr");
       await ensureIslrWithholdingForInvoice(invoice.id);
@@ -365,9 +261,9 @@ export async function createInvoice(
       entity: "invoice",
       entityId: invoice.id,
       payload: {
-        invoice_number: invoiceNumber,
-        move_type: moveType,
-        amount_total: finalTotal,
+        invoice_number: input.invoiceNumber,
+        move_type: input.moveType,
+        amount_total: totals.total,
       },
     });
   } catch {
@@ -375,45 +271,6 @@ export async function createInvoice(
   }
   revalidateAll(invoice.id);
   return { success: `Factura registrada · ${invoice.id}`, id: invoice.id };
-}
-
-async function insertLines(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  invoiceId: string,
-  companyId: string,
-  normalized: Array<{
-    description: string;
-    quantity: number;
-    price_unit: number;
-    rate: number;
-    untaxed: number;
-    tax: number;
-    exempt: number;
-    total: number;
-    concept_id: string | null;
-  }>,
-  withConcept: boolean,
-) {
-  const payload = normalized.map((l) => {
-    const row: Record<string, unknown> = {
-      invoice_id: invoiceId,
-      company_id: companyId,
-      description: l.description,
-      quantity: l.quantity,
-      price_unit: l.price_unit,
-      tax_rate: l.rate,
-      amount_untaxed: l.untaxed || l.exempt,
-      amount_tax: l.tax,
-      amount_total: l.total,
-    };
-    if (withConcept && l.concept_id) row.concept_id = l.concept_id;
-    return row;
-  });
-  const { error } = await supabase.from("invoice_lines").insert(payload);
-  if (error && withConcept && /concept_id|column/i.test(error.message)) {
-    return insertLines(supabase, invoiceId, companyId, normalized, false);
-  }
-  return error?.message || null;
 }
 
 async function tryPostAccounting(invoiceId: string) {
@@ -436,65 +293,45 @@ function revalidateAll(invoiceId?: string) {
   revalidatePath("/app");
 }
 
-/** Aplica % de retención IVA sobre el impuesto de una factura ya guardada. */
 export async function applyIvaRetentionPct(
   invoiceId: string,
   pct: number,
 ): Promise<{ ok: true; retained: number } | { ok: false; error: string }> {
   const company = await getActiveCompany();
   if (!company) return { ok: false, error: "Sin empresa activa." };
-  if (!(pct > 0) || pct > 100) {
-    return { ok: false, error: "Indica un % de retención IVA entre 0.01 y 100 (típico 75)." };
-  }
 
   const supabase = await createClient();
-  const { data: invoice } = await supabase
-    .from("invoices")
-    .select(
-      "id, state, amount_tax, amount_untaxed, amount_total, amount_retained_islr, amount_paid",
-    )
-    .eq("id", invoiceId)
-    .eq("company_id", company.id)
-    .maybeSingle();
-
+  const invoices = new InvoicesRepository(supabase);
+  const invoice = await invoices.getForIvaRetention(invoiceId, company.id);
   if (!invoice) return { ok: false, error: "Factura no encontrada." };
   if (invoice.state === "cancelled") {
     return { ok: false, error: "La factura está anulada." };
   }
 
-  const tax = Number(invoice.amount_tax || 0);
-  const base = Number(invoice.amount_untaxed || 0);
-  if (tax <= 0 || base <= 0) {
-    return {
-      ok: false,
-      error: "Esta factura no tiene IVA (exenta o SDCF). No aplica retención IVA.",
-    };
-  }
+  const result = invoiceDomain.ivaRetentionOnSaved(
+    Number(invoice.amount_tax || 0),
+    Number(invoice.amount_untaxed || 0),
+    pct,
+  );
+  if (!result.ok) return result;
 
-  const ali = snapAlicuota((tax / base) * 100);
-  const retained = seniatIvaWithheld(base, ali, pct);
   const residual = Number(
     (
       Number(invoice.amount_total || 0) -
-      retained -
+      result.retained -
       Number(invoice.amount_retained_islr || 0) -
       Number(invoice.amount_paid || 0)
     ).toFixed(2),
   );
 
-  const { error } = await supabase
-    .from("invoices")
-    .update({
-      amount_retained_iva: retained,
-      amount_residual: residual,
-      payment_state: residual <= 0 ? "paid" : "not_paid",
-    })
-    .eq("id", invoiceId)
-    .eq("company_id", company.id);
-
+  const { error } = await invoices.updateAmounts(invoiceId, company.id, {
+    amount_retained_iva: result.retained,
+    amount_residual: residual,
+    payment_state: residual <= 0 ? "paid" : "not_paid",
+  });
   if (error) return { ok: false, error: error.message };
   revalidateAll();
-  return { ok: true, retained };
+  return { ok: true, retained: result.retained };
 }
 
 export async function updateInvoiceIvaRetention(
@@ -510,32 +347,6 @@ export async function updateInvoiceIvaRetention(
   };
 }
 
-async function cancelInvoiceRow(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  id: string,
-  companyId: string,
-) {
-  const full = await supabase
-    .from("invoices")
-    .update({
-      state: "cancelled",
-      amount_residual: 0,
-      payment_state: "reversed",
-    })
-    .eq("id", id)
-    .eq("company_id", companyId);
-
-  // Si aún no existe el enum payment_state / columna residual
-  if (full.error) {
-    await supabase
-      .from("invoices")
-      .update({ state: "cancelled" })
-      .eq("id", id)
-      .eq("company_id", companyId);
-  }
-}
-
-/** Anula la factura (estado cancelled). Seguro ante FKs. */
 export async function cancelInvoiceById(
   id: string,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -544,62 +355,18 @@ export async function cancelInvoiceById(
   if (!company) return { ok: false, error: "Sin empresa activa." };
 
   const supabase = await createClient();
+  const invoices = new InvoicesRepository(supabase);
 
   try {
-    await cancelInvoiceRow(supabase, id, company.id);
-
-    const [{ count: ivaLinks }, { count: islrLinks }, { count: payLinks }, { count: bookLinks }] =
-      await Promise.all([
-        supabase
-          .from("withholding_iva_lines")
-          .select("*", { count: "exact", head: true })
-          .eq("invoice_id", id),
-        supabase
-          .from("withholding_islr_lines")
-          .select("*", { count: "exact", head: true })
-          .eq("invoice_id", id),
-        supabase
-          .from("payment_allocations")
-          .select("*", { count: "exact", head: true })
-          .eq("invoice_id", id),
-        supabase
-          .from("fiscal_book_lines")
-          .select("*", { count: "exact", head: true })
-          .eq("invoice_id", id),
-      ]);
-
-    const linked =
-      (ivaLinks || 0) + (islrLinks || 0) + (payLinks || 0) + (bookLinks || 0) > 0;
-
+    await invoices.cancel(id, company.id);
+    const linked = await invoices.countLinks(id);
     if (!linked) {
-      const { data: inv } = await supabase
-        .from("invoices")
-        .select("account_move_id")
-        .eq("id", id)
-        .eq("company_id", company.id)
-        .maybeSingle();
-
-      if (inv?.account_move_id) {
-        await supabase
-          .from("account_move_lines")
-          .delete()
-          .eq("move_id", inv.account_move_id);
-        await supabase
-          .from("invoices")
-          .update({ account_move_id: null })
-          .eq("id", id);
-        await supabase.from("account_moves").delete().eq("id", inv.account_move_id);
-      }
-
-      await supabase
-        .from("invoices")
-        .delete()
-        .eq("id", id)
-        .eq("company_id", company.id);
+      const moveId = await invoices.getMoveId(id, company.id);
+      await invoices.deleteUnlinked(id, company.id, moveId);
     }
   } catch {
     try {
-      await cancelInvoiceRow(supabase, id, company.id);
+      await invoices.cancel(id, company.id);
     } catch {
       return { ok: false, error: "No se pudo anular la factura." };
     }
@@ -618,5 +385,3 @@ export async function cancelInvoiceById(
 export async function deleteInvoice(formData: FormData): Promise<void> {
   await cancelInvoiceById(String(formData.get("id") || ""));
 }
-
-export { periodFromDate };

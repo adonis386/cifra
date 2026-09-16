@@ -4,30 +4,15 @@ import { revalidatePath } from "next/cache";
 import { getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { assertPeriodOpen } from "@/lib/actions/periods";
+import {
+  invoiceEntryDomain,
+  nextAccountCode,
+  nextJournalCode,
+  type InvoiceEntryAccounts,
+} from "@/domain/accounting/invoice-entry.service";
+import { AccountingRepository } from "@/repositories/accounting.repository";
 
 export type ActionState = { error?: string; success?: string };
-
-type CompanyAccounts = {
-  id: string;
-  property_account_receivable_id: string | null;
-  property_account_payable_id: string | null;
-  property_account_income_id: string | null;
-  property_account_expense_id: string | null;
-  property_account_tax_sale_id: string | null;
-  property_account_tax_purchase_id: string | null;
-};
-
-async function getCompanyAccounts(companyId: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("companies")
-    .select(
-      "id, property_account_receivable_id, property_account_payable_id, property_account_income_id, property_account_expense_id, property_account_tax_sale_id, property_account_tax_purchase_id",
-    )
-    .eq("id", companyId)
-    .single();
-  return data as CompanyAccounts | null;
-}
 
 export async function ensureCompanyAccountingForm(formData: FormData): Promise<void> {
   await ensureCompanyAccounting(formData);
@@ -39,33 +24,12 @@ export async function ensureCompanyAccounting(
   const company = await getActiveCompany();
   if (!company) return { error: "Crea una empresa primero." };
   const supabase = await createClient();
-  const { error } = await supabase.rpc("seed_company_accounting", {
-    p_company_id: company.id,
-  });
+  const { error } = await new AccountingRepository(supabase).seedPlan(company.id);
   if (error) return { error: error.message };
   revalidatePath("/app/accounts");
   revalidatePath("/app/treasury");
   revalidatePath("/app/config");
   return { success: "Plan de cuentas y diarios listos." };
-}
-
-function nextCode(existing: string[], prefix: string) {
-  const used = new Set(existing.map((c) => c.toUpperCase()));
-  if (!used.has(prefix)) return prefix;
-  for (let i = 2; i < 100; i++) {
-    const code = `${prefix}${i}`;
-    if (!used.has(code)) return code;
-  }
-  return `${prefix}${Date.now().toString().slice(-4)}`;
-}
-
-function nextAccountCode(existing: string[], parent: string) {
-  const used = new Set(existing);
-  for (let i = 1; i < 100; i++) {
-    const code = `${parent}.${String(i).padStart(2, "0")}`;
-    if (!used.has(code)) return code;
-  }
-  return `${parent}.${Date.now().toString().slice(-3)}`;
 }
 
 /** Banco o caja extra para tesorería (cuenta 1.1.02.xx / 1.1.01.xx + diario). */
@@ -82,45 +46,33 @@ export async function createLiquidityJournal(
   if (!name) return { error: "Indica el nombre del banco o la caja." };
 
   const supabase = await createClient();
+  const repo = new AccountingRepository(supabase);
   const seeded = await ensureCompanyAccounting();
   if (seeded.error) return seeded;
 
-  const [{ data: journals }, { data: accounts }] = await Promise.all([
-    supabase
-      .from("account_journals")
-      .select("code")
-      .eq("company_id", company.id),
-    supabase
-      .from("account_accounts")
-      .select("code")
-      .eq("company_id", company.id),
+  const [journals, accounts] = await Promise.all([
+    repo.listJournalCodes(company.id),
+    repo.listAccountCodes(company.id),
   ]);
 
-  const journalCode = nextCode(
-    (journals || []).map((j) => j.code),
-    kind === "cash" ? "CAJ" : "BAN",
-  );
+  const journalCode = nextJournalCode(journals, kind === "cash" ? "CAJ" : "BAN");
   const accountCode = nextAccountCode(
-    (accounts || []).map((a) => a.code),
+    accounts,
     kind === "cash" ? "1.1.01" : "1.1.02",
   );
   const label = number ? `${name} · ${number}` : name;
 
-  const { data: account, error: accErr } = await supabase
-    .from("account_accounts")
-    .insert({
-      company_id: company.id,
-      code: accountCode,
-      name: label,
-      account_type: "asset_cash",
-      reconcile: false,
-      active: true,
-    })
-    .select("id")
-    .single();
+  const { data: account, error: accErr } = await repo.insertAccount({
+    company_id: company.id,
+    code: accountCode,
+    name: label,
+    account_type: "asset_cash",
+    reconcile: false,
+    active: true,
+  });
   if (accErr) return { error: accErr.message };
 
-  const { error: jouErr } = await supabase.from("account_journals").insert({
+  const { error: jouErr } = await repo.insertJournal({
     company_id: company.id,
     code: journalCode,
     name: label,
@@ -129,7 +81,7 @@ export async function createLiquidityJournal(
     active: true,
   });
   if (jouErr) {
-    await supabase.from("account_accounts").delete().eq("id", account.id);
+    await repo.deleteAccount(account.id);
     if (/duplicate|unique|23505/i.test(jouErr.message)) {
       return { error: "Ya existe un diario con ese código. Intenta de nuevo." };
     }
@@ -152,30 +104,18 @@ export async function postInvoiceAccounting(invoiceId: string): Promise<ActionSt
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const repo = new AccountingRepository(supabase);
 
-  const { data: inv } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("id", invoiceId)
-    .eq("company_id", company.id)
-    .single();
+  const inv = await repo.getInvoice(invoiceId, company.id);
   if (!inv) return { error: "Factura no encontrada." };
   if (inv.account_move_id) return { success: "Asiento ya existe." };
 
-  const props = await getCompanyAccounts(company.id);
-  if (!props?.property_account_receivable_id) {
-    await supabase.rpc("seed_company_accounting", { p_company_id: company.id });
-  }
-  const accounts = (await getCompanyAccounts(company.id))!;
+  const accounts = await repo.ensurePlan(company.id);
+  if (!accounts) return { error: "Falta plan de cuentas. Ve a Contabilidad → Plan y regenera." };
 
   const isSale = String(inv.move_type).startsWith("out_");
   const journalCode = isSale ? "VEN" : "COM";
-  const { data: journal } = await supabase
-    .from("account_journals")
-    .select("id")
-    .eq("company_id", company.id)
-    .eq("code", journalCode)
-    .maybeSingle();
+  const journalId = await repo.journalIdByCode(company.id, journalCode);
 
   const partnerAccount = isSale
     ? accounts.property_account_receivable_id
@@ -192,130 +132,58 @@ export async function postInvoiceAccounting(invoiceId: string): Promise<ActionSt
   }
 
   const sign = String(inv.move_type).includes("refund") ? -1 : 1;
-  const untaxed = Number(inv.amount_untaxed) * sign;
-  const tax = Number(inv.amount_tax) * sign;
-  const exempt = Number(inv.amount_exempt) * sign;
-  const total = Number(inv.amount_total) * sign;
-  // Residual cobrable/pagable net of IVA withheld at source (VE practice)
-  const residualBase = Math.abs(
-    Number(inv.amount_total) - Number(inv.amount_retained_iva || 0),
+  const entryAccounts: InvoiceEntryAccounts = {
+    partnerAccount,
+    incomeExpense,
+    taxAccount: taxAccount || null,
+  };
+  const drafts = invoiceEntryDomain.buildLines({
+    isSale,
+    invoiceNumber: inv.invoice_number,
+    partnerId: inv.partner_id,
+    untaxed: Number(inv.amount_untaxed) * sign,
+    tax: Number(inv.amount_tax) * sign,
+    exempt: Number(inv.amount_exempt) * sign,
+    total: Number(inv.amount_total) * sign,
+    retainedIva: Number(inv.amount_retained_iva || 0),
+    accounts: entryAccounts,
+  });
+  const residualBase = invoiceEntryDomain.residualAfterIva(
+    Number(inv.amount_total),
+    Number(inv.amount_retained_iva || 0),
   );
 
   const moveName = `${journalCode}/${inv.invoice_number}`;
-  const { data: move, error: moveErr } = await supabase
-    .from("account_moves")
-    .insert({
-      company_id: company.id,
-      journal_id: journal?.id || null,
-      name: moveName,
-      ref: inv.control_number || inv.invoice_number,
-      move_date: inv.invoice_date,
-      state: "confirmed",
-      partner_id: inv.partner_id,
-      invoice_id: inv.id,
-      created_by: user?.id,
-    })
-    .select("id")
-    .single();
+  const { data: move, error: moveErr } = await repo.insertMove({
+    company_id: company.id,
+    journal_id: journalId || null,
+    name: moveName,
+    ref: inv.control_number || inv.invoice_number,
+    move_date: inv.invoice_date,
+    state: "confirmed",
+    partner_id: inv.partner_id,
+    invoice_id: inv.id,
+    created_by: user?.id,
+  });
   if (moveErr) return { error: moveErr.message };
 
-  const lines: Array<Record<string, unknown>> = [];
-  if (isSale) {
-    // Debit CxC = total
-    lines.push({
-      move_id: move.id,
-      company_id: company.id,
-      account_id: partnerAccount,
-      partner_id: inv.partner_id,
-      name: `Factura ${inv.invoice_number}`,
-      debit: Math.max(total, 0),
-      credit: Math.max(-total, 0),
-      amount_residual: residualBase,
-      invoice_id: inv.id,
-    });
-    // Credit income
-    lines.push({
-      move_id: move.id,
-      company_id: company.id,
-      account_id: incomeExpense,
-      partner_id: inv.partner_id,
-      name: "Ingresos",
-      debit: Math.max(-(untaxed + exempt), 0),
-      credit: Math.max(untaxed + exempt, 0),
-      amount_residual: 0,
-      invoice_id: inv.id,
-    });
-    if (tax !== 0 && taxAccount) {
-      lines.push({
-        move_id: move.id,
-        company_id: company.id,
-        account_id: taxAccount,
-        name: "IVA débito",
-        debit: Math.max(-tax, 0),
-        credit: Math.max(tax, 0),
-        amount_residual: 0,
-        invoice_id: inv.id,
-      });
-    }
-  } else {
-    // Debit expense + IVA, Credit CxP
-    lines.push({
-      move_id: move.id,
-      company_id: company.id,
-      account_id: incomeExpense,
-      partner_id: inv.partner_id,
-      name: "Compra / gasto",
-      debit: Math.max(untaxed + exempt, 0),
-      credit: Math.max(-(untaxed + exempt), 0),
-      amount_residual: 0,
-      invoice_id: inv.id,
-    });
-    if (tax !== 0 && taxAccount) {
-      lines.push({
-        move_id: move.id,
-        company_id: company.id,
-        account_id: taxAccount,
-        name: "IVA crédito",
-        debit: Math.max(tax, 0),
-        credit: Math.max(-tax, 0),
-        amount_residual: 0,
-        invoice_id: inv.id,
-      });
-    }
-    lines.push({
-      move_id: move.id,
-      company_id: company.id,
-      account_id: partnerAccount,
-      partner_id: inv.partner_id,
-      name: `Factura ${inv.invoice_number}`,
-      debit: Math.max(-total, 0),
-      credit: Math.max(total, 0),
-      amount_residual: residualBase,
-      invoice_id: inv.id,
-    });
-  }
-
-  const { error: lineErr } = await supabase.from("account_move_lines").insert(lines);
+  const { error: lineErr } = await repo.insertMoveLines(
+    move.id,
+    company.id,
+    inv.id,
+    drafts,
+  );
   if (lineErr) return { error: lineErr.message };
 
-  await supabase
-    .from("invoices")
-    .update({
-      account_move_id: move.id,
-      amount_residual: residualBase,
-      amount_paid: 0,
-      payment_state: residualBase <= 0 ? "paid" : "not_paid",
-      due_date: inv.due_date || inv.invoice_date,
-    })
-    .eq("id", inv.id);
+  await repo.updateInvoice(inv.id, {
+    account_move_id: move.id,
+    amount_residual: residualBase,
+    amount_paid: 0,
+    payment_state: residualBase <= 0 ? "paid" : "not_paid",
+    due_date: inv.due_date || inv.invoice_date,
+  });
 
   return { success: `Asiento ${moveName}` };
-}
-
-function paymentState(residual: number, total: number): string {
-  if (residual <= 0.009) return "paid";
-  if (residual < total - 0.009) return "partial";
-  return "not_paid";
 }
 
 export async function registerPayment(
@@ -352,82 +220,42 @@ export async function registerPayment(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const props = await getCompanyAccounts(company.id);
-  if (!props?.property_account_receivable_id) {
-    await supabase.rpc("seed_company_accounting", { p_company_id: company.id });
-  }
-  const accounts = (await getCompanyAccounts(company.id))!;
+  const repo = new AccountingRepository(supabase);
+  const accounts = await repo.ensurePlan(company.id);
+  if (!accounts) return { error: "Falta plan de cuentas. Ve a Contabilidad → Plan y regenera." };
 
-  // Resolve open invoices to allocate
   const moveTypes =
     paymentType === "inbound"
       ? ["out_invoice", "out_refund"]
       : ["in_invoice", "in_refund"];
 
-  let openQuery = supabase
-    .from("invoices")
-    .select("id, amount_residual, amount_total, invoice_number")
-    .eq("company_id", company.id)
-    .eq("partner_id", partnerId)
-    .in("move_type", moveTypes)
-    .gt("amount_residual", 0)
-    .neq("state", "cancelled")
-    .order("invoice_date", { ascending: true });
-
-  if (invoiceId) openQuery = openQuery.eq("id", invoiceId);
-
-  const { data: openInvoices } = await openQuery;
-  if (!openInvoices?.length) {
+  const openInvoices = await repo.listOpenInvoices({
+    companyId: company.id,
+    partnerId,
+    moveTypes,
+    invoiceId,
+  });
+  if (!openInvoices.length) {
     return { error: "No hay facturas abiertas para ese tercero." };
   }
 
-  let paymentId: string | null = null;
-  {
-    const { data: payment, error: payErr } = await supabase
-      .from("payments")
-      .insert({
-        company_id: company.id,
-        partner_id: partnerId,
-        journal_id: journalId,
-        payment_type: paymentType,
-        payment_date: paymentDate,
-        amount,
-        exchange_rate: exchangeRate,
-        amount_usd: amountUsd,
-        memo: memo || null,
-        reference: reference || null,
-        state: "confirmed",
-        created_by: user?.id,
-      })
-      .select("id")
-      .single();
-
-    if (!payErr && payment) {
-      paymentId = payment.id;
-    } else if (payErr && /exchange_rate|amount_usd|column/i.test(payErr.message)) {
-      const { data: legacyPay, error: legacyErr } = await supabase
-        .from("payments")
-        .insert({
-          company_id: company.id,
-          partner_id: partnerId,
-          journal_id: journalId,
-          payment_type: paymentType,
-          payment_date: paymentDate,
-          amount,
-          memo: memo || null,
-          reference: reference || null,
-          state: "confirmed",
-          created_by: user?.id,
-        })
-        .select("id")
-        .single();
-      if (legacyErr) return { error: legacyErr.message };
-      paymentId = legacyPay.id;
-    } else if (payErr) {
-      return { error: payErr.message };
-    }
-  }
-  if (!paymentId) return { error: "No se pudo registrar el pago." };
+  const { data: payment, error: payErr } = await repo.insertPayment({
+    company_id: company.id,
+    partner_id: partnerId,
+    journal_id: journalId,
+    payment_type: paymentType,
+    payment_date: paymentDate,
+    amount,
+    exchange_rate: exchangeRate,
+    amount_usd: amountUsd,
+    memo: memo || null,
+    reference: reference || null,
+    state: "confirmed",
+    created_by: user?.id,
+  });
+  if (payErr) return { error: payErr.message };
+  if (!payment) return { error: "No se pudo registrar el pago." };
+  const paymentId = payment.id as string;
 
   let remaining = amount;
   const allocations: Array<{
@@ -450,41 +278,28 @@ export async function registerPayment(
     });
     const newResidual = Number((due - apply).toFixed(2));
     const paidSoFar = Number(inv.amount_total) - newResidual;
-    await supabase
-      .from("invoices")
-      .update({
-        amount_residual: Math.max(newResidual, 0),
-        amount_paid: Number(paidSoFar.toFixed(2)),
-        payment_state: paymentState(newResidual, Number(inv.amount_total)),
-      })
-      .eq("id", inv.id);
+    await repo.updateInvoice(inv.id, {
+      amount_residual: Math.max(newResidual, 0),
+      amount_paid: Number(paidSoFar.toFixed(2)),
+      payment_state: invoiceEntryDomain.paymentState(
+        newResidual,
+        Number(inv.amount_total),
+      ),
+    });
     remaining = Number((remaining - apply).toFixed(2));
   }
 
   if (!allocations.length) {
     return { error: "No se pudo aplicar el pago." };
   }
-  await supabase.from("payment_allocations").insert(allocations);
+  await repo.insertAllocations(allocations);
 
-  // Banco/caja del diario elegido (no siempre 1.1.02 genérico)
   let liquidity: string | null = null;
   if (journalId) {
-    const { data: journal } = await supabase
-      .from("account_journals")
-      .select("default_account_id")
-      .eq("id", journalId)
-      .eq("company_id", company.id)
-      .maybeSingle();
-    liquidity = journal?.default_account_id || null;
+    liquidity = await repo.journalDefaultAccount(journalId, company.id);
   }
   if (!liquidity) {
-    const { data: fallback } = await supabase
-      .from("account_accounts")
-      .select("id")
-      .eq("company_id", company.id)
-      .eq("code", "1.1.02")
-      .maybeSingle();
-    liquidity = fallback?.id || null;
+    liquidity = await repo.accountIdByCode(company.id, "1.1.02");
   }
 
   const partnerAccount =
@@ -494,29 +309,23 @@ export async function registerPayment(
 
   const applied = Number((amount - remaining).toFixed(2));
   if (liquidity && partnerAccount) {
-    const { data: move } = await supabase
-      .from("account_moves")
-      .insert({
-        company_id: company.id,
-        journal_id: journalId,
-        name: `PAY/${paymentDate.replace(/-/g, "")}/${String(Date.now()).slice(-4)}`,
-        ref: reference || memo || null,
-        move_date: paymentDate,
-        state: "confirmed",
-        partner_id: partnerId,
-        payment_id: paymentId,
-        created_by: user?.id,
-      })
-      .select("id")
-      .single();
+    const { data: move } = await repo.insertMove({
+      company_id: company.id,
+      journal_id: journalId,
+      name: `PAY/${paymentDate.replace(/-/g, "")}/${String(Date.now()).slice(-4)}`,
+      ref: reference || memo || null,
+      move_date: paymentDate,
+      state: "confirmed",
+      partner_id: partnerId,
+      payment_id: paymentId,
+      created_by: user?.id,
+    });
 
     if (move) {
       const lines =
         paymentType === "inbound"
           ? [
               {
-                move_id: move.id,
-                company_id: company.id,
                 account_id: liquidity,
                 name: "Cobro",
                 debit: applied,
@@ -524,8 +333,6 @@ export async function registerPayment(
                 amount_residual: 0,
               },
               {
-                move_id: move.id,
-                company_id: company.id,
                 account_id: partnerAccount,
                 partner_id: partnerId,
                 name: "CxC",
@@ -536,8 +343,6 @@ export async function registerPayment(
             ]
           : [
               {
-                move_id: move.id,
-                company_id: company.id,
                 account_id: partnerAccount,
                 partner_id: partnerId,
                 name: "CxP",
@@ -546,8 +351,6 @@ export async function registerPayment(
                 amount_residual: 0,
               },
               {
-                move_id: move.id,
-                company_id: company.id,
                 account_id: liquidity,
                 name: "Pago",
                 debit: 0,
@@ -555,8 +358,8 @@ export async function registerPayment(
                 amount_residual: 0,
               },
             ];
-      await supabase.from("account_move_lines").insert(lines);
-      await supabase.from("payments").update({ move_id: move.id }).eq("id", paymentId);
+      await repo.insertMoveLines(move.id, company.id, null, lines);
+      await repo.updatePaymentMove(paymentId, move.id);
     }
   }
 
@@ -570,17 +373,6 @@ export async function registerPayment(
       remaining > 0 ? ` · sobrante ${remaining.toFixed(2)}` : ""
     }`,
   };
-}
-
-async function accountIdByCode(companyId: string, code: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("account_accounts")
-    .select("id")
-    .eq("company_id", companyId)
-    .eq("code", code)
-    .maybeSingle();
-  return data?.id || null;
 }
 
 /** Asiento de retención: compra Dr CxP / Cr ret. por pagar. Venta IVA Dr débito / Cr CxC. */
@@ -600,25 +392,16 @@ export async function postWithholdingAccounting(input: {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const repo = new AccountingRepository(supabase);
 
-  const { data: inv } = await supabase
-    .from("invoices")
-    .select("id, move_type, partner_id, invoice_number")
-    .eq("id", input.invoiceId)
-    .eq("company_id", company.id)
-    .single();
+  const inv = await repo.getInvoiceLite(input.invoiceId, company.id);
   if (!inv) return { error: "Factura no encontrada." };
 
   const ref = `WH-${input.kind.toUpperCase()}-${input.voucherNumber}`;
-  const { data: existing } = await supabase
-    .from("account_moves")
-    .select("id")
-    .eq("company_id", company.id)
-    .eq("ref", ref)
-    .maybeSingle();
+  const existing = await repo.findMoveByRef(company.id, ref);
   if (existing) return { success: "Asiento de retención ya existe." };
 
-  const props = await getCompanyAccounts(company.id);
+  const props = await repo.getCompanyAccounts(company.id);
   const isSale = String(inv.move_type).startsWith("out_");
   if (isSale && input.kind === "islr") {
     return { success: "ISLR de venta no genera asiento." };
@@ -630,88 +413,66 @@ export async function postWithholdingAccounting(input: {
   const ivaDebito = props?.property_account_tax_sale_id;
   const liability =
     input.kind === "iva"
-      ? await accountIdByCode(company.id, "2.1.03")
-      : await accountIdByCode(company.id, "2.1.04");
+      ? await repo.accountIdByCode(company.id, "2.1.03")
+      : await repo.accountIdByCode(company.id, "2.1.04");
 
   if (!partnerAccount || (isSale && !ivaDebito) || (!isSale && !liability)) {
     return { error: "Faltan cuentas de retención en el plan. Regenera el plan VE." };
   }
 
-  const { data: journal } = await supabase
-    .from("account_journals")
-    .select("id")
-    .eq("company_id", company.id)
-    .eq("code", "MISC")
-    .maybeSingle();
-
-  const { data: move, error: moveErr } = await supabase
-    .from("account_moves")
-    .insert({
-      company_id: company.id,
-      journal_id: journal?.id || null,
-      name: ref,
-      ref,
-      move_date: input.date,
-      state: "confirmed",
-      partner_id: inv.partner_id,
-      invoice_id: inv.id,
-      notes: `Retención ${input.kind.toUpperCase()} ${input.voucherNumber}`,
-      created_by: user?.id,
-    })
-    .select("id")
-    .single();
+  const journalId = await repo.journalIdByCode(company.id, "MISC");
+  const { data: move, error: moveErr } = await repo.insertMove({
+    company_id: company.id,
+    journal_id: journalId || null,
+    name: ref,
+    ref,
+    move_date: input.date,
+    state: "confirmed",
+    partner_id: inv.partner_id,
+    invoice_id: inv.id,
+    notes: `Retención ${input.kind.toUpperCase()} ${input.voucherNumber}`,
+    created_by: user?.id,
+  });
   if (moveErr) return { error: moveErr.message };
 
   const label = input.kind === "iva" ? "Retención IVA" : "Retención ISLR";
   const lines = isSale
     ? [
         {
-          move_id: move.id,
-          company_id: company.id,
           account_id: ivaDebito!,
           name: `${label} ${inv.invoice_number}`,
           debit: amount,
           credit: 0,
           amount_residual: 0,
-          invoice_id: inv.id,
         },
         {
-          move_id: move.id,
-          company_id: company.id,
           account_id: partnerAccount,
           partner_id: inv.partner_id,
           name: `${label} ${inv.invoice_number}`,
           debit: 0,
           credit: amount,
           amount_residual: 0,
-          invoice_id: inv.id,
         },
       ]
     : [
         {
-          move_id: move.id,
-          company_id: company.id,
           account_id: partnerAccount,
           partner_id: inv.partner_id,
           name: `${label} ${inv.invoice_number}`,
           debit: amount,
           credit: 0,
           amount_residual: 0,
-          invoice_id: inv.id,
         },
         {
-          move_id: move.id,
-          company_id: company.id,
           account_id: liability!,
           name: `${label} ${input.voucherNumber}`,
           debit: 0,
           credit: amount,
           amount_residual: 0,
-          invoice_id: inv.id,
         },
       ];
 
-  const { error: lineErr } = await supabase.from("account_move_lines").insert(lines);
+  const { error: lineErr } = await repo.insertMoveLines(move.id, company.id, inv.id, lines);
   if (lineErr) return { error: lineErr.message };
 
   revalidatePath("/app/ledger");
