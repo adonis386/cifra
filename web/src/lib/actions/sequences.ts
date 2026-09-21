@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+import {
+  formatInvoiceSerial,
+  nextSaleInvoiceSerial,
+  parseInvoiceSerial,
+} from "@/domain/invoices/invoice-number";
 
 /** Next sequence value: optional period prefix (AAAAMM) + padded counter. */
 export async function nextCompanySequence(
@@ -75,6 +80,7 @@ export async function listCompanySequences(): Promise<SequenceRow[]> {
 
   const codes = [
     { code: "nro_ctrl", label: "N° control factura" },
+    { code: "nro_fact", label: "N° factura venta" },
     { code: "wh_iva", label: "Comprobante retención IVA" },
     { code: "wh_islr", label: "Comprobante retención ISLR" },
   ];
@@ -86,7 +92,7 @@ export async function listCompanySequences(): Promise<SequenceRow[]> {
         code: c.code,
         prefix: "",
         next_number: 1,
-        padding: c.code === "nro_ctrl" ? 8 : 8,
+        padding: c.code === "nro_fact" ? 4 : 8,
       },
       { onConflict: "company_id,code", ignoreDuplicates: true },
     );
@@ -128,13 +134,13 @@ export async function updateSequenceNext(
   }
 
   const supabase = await createClient();
+  const padding = code === "nro_fact" ? 4 : 8;
   const { error } = await supabase.from("sequences").upsert(
     {
       company_id: company.id,
       code,
-      prefix: "",
       next_number: nextNumber,
-      padding: 8,
+      padding,
     },
     { onConflict: "company_id,code" },
   );
@@ -142,4 +148,100 @@ export async function updateSequenceNext(
   if (error) return { error: error.message };
   revalidatePath("/app/config");
   return { success: `Correlativo ${code} actualizado a ${nextNumber}.` };
+}
+
+/** Siguiente Nº de factura de venta. `allocate` reserva el correlativo (botón Auto). */
+export async function nextSaleInvoiceNumber(opts?: {
+  allocate?: boolean;
+}): Promise<{ ok: true; value: string } | { ok: false; error: string }> {
+  const company = await getActiveCompany();
+  if (!company) return { ok: false, error: "Sin empresa activa." };
+
+  const supabase = await createClient();
+  const { data: invoices } = await supabase
+    .from("invoices")
+    .select("invoice_number")
+    .eq("company_id", company.id)
+    .in("move_type", ["out_invoice", "out_refund"])
+    .neq("state", "cancelled");
+
+  const suggested = nextSaleInvoiceSerial(
+    (invoices || []).map((i) => String(i.invoice_number || "")),
+  );
+  const parsed = parseInvoiceSerial(suggested) || {
+    prefix: "F-",
+    n: 1,
+    width: 4,
+  };
+
+  const { data: seq } = await supabase
+    .from("sequences")
+    .select("id, prefix, next_number, padding")
+    .eq("company_id", company.id)
+    .eq("code", "nro_fact")
+    .maybeSingle();
+
+  const prefix = (seq?.prefix && String(seq.prefix)) || parsed.prefix;
+  const seqPadding = Number(seq?.padding || 0);
+  const width = seqPadding > 0 ? seqPadding : parsed.width;
+  const n = Math.max(Number(seq?.next_number) || 1, parsed.n);
+  const value = formatInvoiceSerial(prefix, n, width);
+
+  if (opts?.allocate) {
+    if (seq?.id) {
+      await supabase
+        .from("sequences")
+        .update({
+          next_number: n + 1,
+          prefix,
+          padding: width,
+        })
+        .eq("id", seq.id);
+    } else {
+      await supabase.from("sequences").insert({
+        company_id: company.id,
+        code: "nro_fact",
+        prefix,
+        next_number: n + 1,
+        padding: width,
+      });
+    }
+  }
+
+  return { ok: true, value };
+}
+
+/** Si el número usado es ≥ al correlativo, avanza el siguiente. */
+export async function syncSaleInvoiceSequence(usedNumber: string): Promise<void> {
+  const parsed = parseInvoiceSerial(usedNumber);
+  if (!parsed || /^BORRADOR/i.test(usedNumber)) return;
+  const company = await getActiveCompany();
+  if (!company) return;
+  const supabase = await createClient();
+  const { data: seq } = await supabase
+    .from("sequences")
+    .select("id, next_number, prefix, padding")
+    .eq("company_id", company.id)
+    .eq("code", "nro_fact")
+    .maybeSingle();
+  const next = parsed.n + 1;
+  if (seq?.id) {
+    if (Number(seq.next_number) <= parsed.n) {
+      await supabase
+        .from("sequences")
+        .update({
+          next_number: next,
+          prefix: seq.prefix || parsed.prefix,
+        })
+        .eq("id", seq.id);
+    }
+    return;
+  }
+  await supabase.from("sequences").insert({
+    company_id: company.id,
+    code: "nro_fact",
+    prefix: parsed.prefix,
+    next_number: next,
+    padding: parsed.width,
+  });
 }

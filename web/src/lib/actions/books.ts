@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+import { POSTED_INVOICE_STATES } from "@/domain/invoices/invoice-state";
 
 export type ActionState = { error?: string; success?: string };
 
@@ -173,7 +174,7 @@ export async function generateFiscalBook(
       .in("move_type", moveTypes)
       .gte("registration_date", periodStart)
       .lte("registration_date", periodEnd)
-      .neq("state", "cancelled")
+      .in("state", [...POSTED_INVOICE_STATES])
       .eq("sin_cred", false)
       .order("registration_date", { ascending: true })
       .order("invoice_date", { ascending: true });
@@ -191,7 +192,7 @@ export async function generateFiscalBook(
       .in("move_type", moveTypes)
       .gte("registration_date", periodStart)
       .lte("registration_date", periodEnd)
-      .neq("state", "cancelled")
+      .in("state", [...POSTED_INVOICE_STATES])
       .eq("sin_cred", false)
       .order("registration_date", { ascending: true })
       .order("invoice_date", { ascending: true });
@@ -209,7 +210,7 @@ export async function generateFiscalBook(
       .in("move_type", moveTypes)
       .gte("invoice_date", periodStart)
       .lte("invoice_date", periodEnd)
-      .neq("state", "cancelled")
+      .in("state", [...POSTED_INVOICE_STATES])
       .order("invoice_date", { ascending: true });
     invoices = res.data as BookInvoice[] | null;
     invErr = res.error;
@@ -225,7 +226,7 @@ export async function generateFiscalBook(
       .in("move_type", moveTypes)
       .gte("invoice_date", periodStart)
       .lte("invoice_date", periodEnd)
-      .neq("state", "cancelled")
+      .in("state", [...POSTED_INVOICE_STATES])
       .order("invoice_date", { ascending: true });
     invoices = res.data as BookInvoice[] | null;
     invErr = res.error;

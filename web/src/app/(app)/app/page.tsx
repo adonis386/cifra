@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
+import { formatDual, formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
 import { Button } from "@/components/ui";
 import { PageHeader } from "@/components/layout";
 import { seniatMonthlyDue } from "@/lib/seniat/due-calendar";
+import { monthBounds } from "@/domain/accounting/period";
+import { AccountingRepository } from "@/repositories/accounting.repository";
+import { POSTED_INVOICE_STATES } from "@/domain/invoices/invoice-state";
 
 function greetingForHour(hour: number) {
   if (hour < 12) return "Buenos días";
@@ -49,8 +52,16 @@ export default async function AppHomePage() {
 
   const dues = seniatMonthlyDue(today);
   const periodYm = dues[0]?.period || today.slice(0, 7);
-  const periodStart = `${periodYm}-01`;
-  const periodEnd = `${periodYm}-31`;
+  const seniatBounds = monthBounds(periodYm) || {
+    start: `${periodYm}-01`,
+    end: `${periodYm}-31`,
+    name: periodYm,
+  };
+  const periodStart = seniatBounds.start;
+  const periodEnd = seniatBounds.end;
+  const calendarYm = today.slice(0, 7);
+  const month = monthBounds(calendarYm) || seniatBounds;
+  const repo = company ? new AccountingRepository(supabase) : null;
 
   const [
     rate,
@@ -60,6 +71,9 @@ export default async function AppHomePage() {
     { data: booksForPeriod },
     { count: ivaWhCount },
     { count: islrWhCount },
+    cashBank,
+    openExtract,
+    { count: monthMoveCount },
   ] = await Promise.all([
     company ? getExchangeRate(company.id, today) : Promise.resolve(null),
     company
@@ -68,14 +82,15 @@ export default async function AppHomePage() {
           .select("id, move_type, amount_residual, amount_total, payment_state")
           .eq("company_id", company.id)
           .gt("amount_residual", 0)
-          .neq("state", "cancelled")
+          .in("state", [...POSTED_INVOICE_STATES])
       : Promise.resolve({ data: null }),
     company
       ? supabase
           .from("invoices")
           .select("*", { count: "exact", head: true })
           .eq("company_id", company.id)
-          .gte("invoice_date", `${today.slice(0, 7)}-01`)
+          .in("state", [...POSTED_INVOICE_STATES])
+          .gte("invoice_date", month.start)
       : Promise.resolve({ count: 0 }),
     company
       ? supabase
@@ -84,6 +99,7 @@ export default async function AppHomePage() {
             "id, invoice_number, amount_total, payment_state, state, move_type, partners(name)",
           )
           .eq("company_id", company.id)
+          .in("state", [...POSTED_INVOICE_STATES])
           .order("invoice_date", { ascending: false })
           .limit(5)
       : Promise.resolve({ data: null }),
@@ -111,6 +127,18 @@ export default async function AppHomePage() {
           .eq("period", periodYm.replace("-", ""))
           .neq("state", "cancelled")
       : Promise.resolve({ count: 0 }),
+    repo
+      ? repo.cashBankBalance(company!.id)
+      : Promise.resolve({ cash: 0, bank: 0, total: 0 }),
+    repo ? repo.listOpenStatementLines(company!.id) : Promise.resolve([]),
+    company
+      ? supabase
+          .from("account_moves")
+          .select("*", { count: "exact", head: true })
+          .eq("company_id", company.id)
+          .gte("move_date", month.start)
+          .lte("move_date", month.end)
+      : Promise.resolve({ count: 0 }),
   ]);
 
   const saleOpen = (openInvoices || []).filter((i) =>
@@ -124,6 +152,13 @@ export default async function AppHomePage() {
     (s, i) => s + Number(i.amount_residual || 0),
     0,
   );
+  const unreconciledAmount = (openExtract || []).reduce(
+    (s, l) => s + Math.abs(Number(l.amount || 0)),
+    0,
+  );
+  const unreconciledCount = openExtract?.length || 0;
+  const money = (n: number) =>
+    rate ? formatDual(n, rate) : `Bs ${formatMoney(n)}`;
   const hasSaleBook = (booksForPeriod || []).some((b) => b.book_type === "sale");
   const hasPurchaseBook = (booksForPeriod || []).some(
     (b) => b.book_type === "purchase",
@@ -193,15 +228,33 @@ export default async function AppHomePage() {
         {[
           {
             label: "Por cobrar",
-            value: `Bs ${formatMoney(cxc)}`,
+            value: money(cxc),
             hint: `${saleOpen.length} factura${saleOpen.length === 1 ? "" : "s"} abierta${saleOpen.length === 1 ? "" : "s"}`,
             href: "/app/receivables",
           },
           {
             label: "Por pagar",
-            value: `Bs ${formatMoney(cxp)}`,
+            value: money(cxp),
             hint: `${purchaseOpen.length} factura${purchaseOpen.length === 1 ? "" : "s"} abierta${purchaseOpen.length === 1 ? "" : "s"}`,
             href: "/app/payables",
+          },
+          {
+            label: "Caja y bancos",
+            value: money(cashBank.total),
+            hint: `Caja ${formatMoney(cashBank.cash)} · Bancos ${formatMoney(cashBank.bank)}`,
+            href: "/app/treasury",
+          },
+          {
+            label: "Por conciliar",
+            value: money(unreconciledAmount),
+            hint: `${unreconciledCount} línea${unreconciledCount === 1 ? "" : "s"} de extracto`,
+            href: "/app/treasury",
+          },
+          {
+            label: "Asientos del mes",
+            value: String(monthMoveCount ?? 0),
+            hint: month.name,
+            href: "/app/entries",
           },
           {
             label: "Facturas del mes",

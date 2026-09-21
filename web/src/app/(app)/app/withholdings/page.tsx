@@ -3,6 +3,7 @@ import { MunicipalForms } from "@/components/municipal/municipal-forms";
 import { WithholdingHub } from "@/components/withholdings/withholding-forms";
 import { formatMoney, getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+import { POSTED_INVOICE_STATES } from "@/domain/invoices/invoice-state";
 import {
   Badge,
   DataTable,
@@ -53,7 +54,7 @@ export default async function WithholdingsPage({
       .from("invoices")
       .select("id, invoice_number, invoice_date, amount_retained_iva, amount_retained_islr, amount_untaxed, amount_tax, partners(name, rif)")
       .eq("company_id", company.id)
-      .neq("state", "cancelled")
+      .in("state", [...POSTED_INVOICE_STATES])
       .order("invoice_date", { ascending: false }),
     supabase
       .from("withholding_iva")

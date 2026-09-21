@@ -5,6 +5,12 @@ import { getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/actions/audit";
 import { assertPeriodOpen } from "@/lib/actions/periods";
+import {
+  dateNearby,
+  statementMatchesLiquidity,
+} from "@/domain/accounting/reconcile.service";
+import { round2 } from "@/domain/money";
+import { AccountingRepository } from "@/repositories/accounting.repository";
 
 export type ActionState = { error?: string; success?: string };
 
@@ -105,8 +111,17 @@ export async function createManualEntry(
 
   if (moveErr) return { error: moveErr.message };
 
-  const { error: lineErr } = await supabase.from("account_move_lines").insert(
-    normalized.map((l) => ({
+  const repo = new AccountingRepository(supabase);
+  const flags = await repo.listAccountReconcileFlags(
+    company.id,
+    normalized.map((l) => l.account_id),
+  );
+
+  const payloads = normalized.map((l) => {
+    const residual = flags.get(l.account_id)
+      ? round2(Math.abs(l.debit - l.credit))
+      : 0;
+    return {
       move_id: move.id,
       company_id: company.id,
       account_id: l.account_id,
@@ -114,10 +129,20 @@ export async function createManualEntry(
       name: l.name,
       debit: l.debit,
       credit: l.credit,
-      amount_residual: 0,
-    })),
-  );
-  if (lineErr) {
+      amount_residual: residual,
+      reconciled: residual <= 0.009,
+    };
+  });
+  const { error: lineErr } = await supabase.from("account_move_lines").insert(payloads);
+  if (lineErr && /reconciled|column|schema cache/i.test(lineErr.message)) {
+    const retry = await supabase.from("account_move_lines").insert(
+      payloads.map(({ reconciled: _r, ...row }) => row),
+    );
+    if (retry.error) {
+      await supabase.from("account_moves").delete().eq("id", move.id);
+      return { error: retry.error.message };
+    }
+  } else if (lineErr) {
     await supabase.from("account_moves").delete().eq("id", move.id);
     return { error: lineErr.message };
   }
@@ -219,6 +244,8 @@ export async function addBankStatementLine(
   if (!statementId || !lineDate) {
     return { error: "Fecha es obligatoria." };
   }
+  const periodOk = await assertPeriodOpen(company.id, lineDate);
+  if (!periodOk.ok) return { error: periodOk.error };
 
   const supabase = await createClient();
 
@@ -229,13 +256,13 @@ export async function addBankStatementLine(
   let partnerId: string | null = null;
   let moveLineId: string | null = null;
 
+  const repo = new AccountingRepository(supabase);
+
   if (paymentId) {
-    const { data: pay } = await supabase
-      .from("payments")
-      .select("id, amount, payment_type, reference, memo, partner_id, move_id, partners(name)")
-      .eq("id", paymentId)
-      .eq("company_id", company.id)
-      .maybeSingle();
+    const { payment: pay, line } = await repo.liquidityLineForPayment(
+      paymentId,
+      company.id,
+    );
     if (!pay) return { error: "Pago no encontrado." };
     const signed =
       pay.payment_type === "outbound"
@@ -249,15 +276,9 @@ export async function addBankStatementLine(
       (Array.isArray(p) ? p[0]?.name : p?.name) ||
       "";
     partnerId = pay.partner_id;
-    reconciled = true;
-    if (pay.move_id) {
-      const { data: ml } = await supabase
-        .from("account_move_lines")
-        .select("id")
-        .eq("move_id", pay.move_id)
-        .limit(1)
-        .maybeSingle();
-      moveLineId = ml?.id || null;
+    moveLineId = line?.id || null;
+    if (moveLineId && statementMatchesLiquidity(amountFinal, Number(line?.debit), Number(line?.credit))) {
+      reconciled = true;
     }
   }
 
@@ -300,38 +321,104 @@ export async function reconcileStatementLine(
   const company = await getActiveCompany();
   if (!company) return { error: "Sin empresa." };
   const lineId = String(formData.get("line_id") || "");
+  const moveLineId = String(formData.get("move_line_id") || "").trim();
   const paymentId = String(formData.get("payment_id") || "").trim();
-  if (!lineId || !paymentId) return { error: "Elige un pago para conciliar." };
+  if (!lineId || (!moveLineId && !paymentId)) {
+    return { error: "Elige un movimiento de caja o banco para conciliar." };
+  }
 
   const supabase = await createClient();
-  const { data: pay } = await supabase
-    .from("payments")
-    .select("id, reference, memo, partner_id, move_id, partners(name)")
-    .eq("id", paymentId)
+  const repo = new AccountingRepository(supabase);
+
+  const { data: statementLine } = await supabase
+    .from("bank_statement_lines")
+    .select(
+      "id, amount, line_date, is_reconciled, statement_id, bank_statements(journal_id)",
+    )
+    .eq("id", lineId)
     .eq("company_id", company.id)
     .maybeSingle();
-  if (!pay) return { error: "Pago no encontrado." };
+  if (!statementLine) return { error: "Línea de extracto no encontrada." };
+  if (statementLine.is_reconciled) return { success: "Ya estaba conciliada." };
 
-  const p = pay.partners as unknown as { name?: string } | { name?: string }[] | null;
-  const partnerName = Array.isArray(p) ? p[0]?.name : p?.name;
-  let moveLineId: string | null = null;
-  if (pay.move_id) {
-    const { data: ml } = await supabase
-      .from("account_move_lines")
-      .select("id")
-      .eq("move_id", pay.move_id)
-      .limit(1)
-      .maybeSingle();
-    moveLineId = ml?.id || null;
+  const periodOk = await assertPeriodOpen(company.id, String(statementLine.line_date));
+  if (!periodOk.ok) return { error: periodOk.error };
+
+  const st = Array.isArray(statementLine.bank_statements)
+    ? statementLine.bank_statements[0]
+    : statementLine.bank_statements;
+  const statementJournalId = st?.journal_id || null;
+
+  let targetId = moveLineId;
+  let linkedPaymentId: string | null = paymentId || null;
+  let partnerId: string | null = null;
+  let partnerName: string | null = null;
+  let paymentRef: string | null = null;
+
+  if (!targetId && paymentId) {
+    const found = await repo.liquidityLineForPayment(paymentId, company.id);
+    if (!found.payment) return { error: "Pago no encontrado." };
+    if (!found.line) {
+      return { error: "Ese pago no tiene línea de caja o banco." };
+    }
+    targetId = found.line.id;
+    const p = found.payment.partners as unknown as
+      | { name?: string }
+      | { name?: string }[]
+      | null;
+    partnerId = found.payment.partner_id;
+    partnerName = Array.isArray(p) ? p[0]?.name || null : p?.name || null;
+    paymentRef = found.payment.reference || found.payment.memo || null;
+  }
+
+  const { data: moveLine } = await supabase
+    .from("account_move_lines")
+    .select(
+      "id, debit, credit, partner_id, name, account_accounts(account_type), account_moves(move_date, journal_id, payment_id, name)",
+    )
+    .eq("id", targetId)
+    .eq("company_id", company.id)
+    .maybeSingle();
+  if (!moveLine) return { error: "Movimiento de caja/banco no encontrado." };
+
+  const account = Array.isArray(moveLine.account_accounts)
+    ? moveLine.account_accounts[0]
+    : moveLine.account_accounts;
+  if (account?.account_type !== "asset_cash") {
+    return { error: "Conciliar el extracto contra una línea de caja o banco." };
+  }
+
+  const move = Array.isArray(moveLine.account_moves)
+    ? moveLine.account_moves[0]
+    : moveLine.account_moves;
+  if (statementJournalId && move?.journal_id && statementJournalId !== move.journal_id) {
+    return { error: "El movimiento debe ser del mismo diario del extracto." };
+  }
+  if (
+    !statementMatchesLiquidity(
+      Number(statementLine.amount),
+      Number(moveLine.debit),
+      Number(moveLine.credit),
+    )
+  ) {
+    return { error: "El monto del extracto no coincide con el movimiento (tolerancia 0,01)." };
+  }
+  if (move?.move_date && !dateNearby(String(statementLine.line_date), String(move.move_date))) {
+    return { error: "La fecha no coincide (máximo 7 días)." };
+  }
+
+  const already = await repo.matchedLiquidityIds(company.id);
+  if (already.has(moveLine.id)) {
+    return { error: "Ese movimiento de caja/banco ya está conciliado." };
   }
 
   const patch: Record<string, unknown> = {
     is_reconciled: true,
-    payment_id: paymentId,
-    partner_id: pay.partner_id,
-    partner_name: partnerName || null,
-    payment_ref: pay.reference || pay.memo || null,
-    move_line_id: moveLineId,
+    move_line_id: moveLine.id,
+    payment_id: linkedPaymentId || move?.payment_id || null,
+    partner_id: partnerId || moveLine.partner_id || null,
+    partner_name: partnerName,
+    payment_ref: paymentRef || moveLine.name || null,
   };
   const { error } = await supabase
     .from("bank_statement_lines")
@@ -350,5 +437,6 @@ export async function reconcileStatementLine(
     return { error: error.message };
   }
   revalidatePath("/app/treasury");
-  return { success: "Línea conciliada." };
+  revalidatePath("/app");
+  return { success: "Línea conciliada con caja/banco." };
 }

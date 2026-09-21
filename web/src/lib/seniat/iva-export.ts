@@ -8,6 +8,7 @@ import {
 } from "@/lib/seniat/txt-iva";
 import { periodFromDate } from "@/lib/company";
 import { nextCompanySequence } from "@/lib/actions/sequences";
+import { POSTED_INVOICE_STATES } from "@/domain/invoices/invoice-state";
 
 type CompanyRef = { id: string; rif: string };
 
@@ -143,7 +144,7 @@ export async function loadInvoicesWithIvaRetention(
       "id, partner_id, move_type, operation_type, doc_type, invoice_date, registration_date, invoice_number, control_number, affected_document, import_file_number, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva, partners(rif)",
     )
     .eq("company_id", companyId)
-    .neq("state", "cancelled")
+    .in("state", [...POSTED_INVOICE_STATES])
     .gt("amount_retained_iva", 0)
     .gte("registration_date", dateFrom)
     .lte("registration_date", dateTo)
@@ -158,7 +159,7 @@ export async function loadInvoicesWithIvaRetention(
         "id, partner_id, move_type, operation_type, doc_type, invoice_date, invoice_number, control_number, affected_document, import_file_number, amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva, partners(rif)",
       )
       .eq("company_id", companyId)
-      .neq("state", "cancelled")
+      .in("state", [...POSTED_INVOICE_STATES])
       .gt("amount_retained_iva", 0)
       .gte("invoice_date", dateFrom)
       .lte("invoice_date", dateTo)

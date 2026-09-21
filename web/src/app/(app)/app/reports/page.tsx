@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { ReportExportActions } from "@/components/report-export-actions";
 import { formatMoney, getActiveCompany } from "@/lib/company";
+import { POSTED_INVOICE_STATES } from "@/domain/invoices/invoice-state";
 import { createClient } from "@/lib/supabase/server";
 import {
   DataTable,
@@ -113,12 +114,14 @@ export default async function ReportsPage({
         .select("*", { count: "exact", head: true })
         .eq("company_id", company.id)
         .in("move_type", ["out_invoice", "out_refund"])
+        .in("state", [...POSTED_INVOICE_STATES])
         .gt("amount_residual", 0),
       supabase
         .from("invoices")
         .select("*", { count: "exact", head: true })
         .eq("company_id", company.id)
         .in("move_type", ["in_invoice", "in_refund"])
+        .in("state", [...POSTED_INVOICE_STATES])
         .gt("amount_residual", 0),
       supabase
         .from("payments")

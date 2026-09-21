@@ -13,6 +13,12 @@ import {
 } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
+  liquiditySignedAmount,
+  suggestLiquidityMatches,
+} from "@/domain/accounting/reconcile.service";
+import { monthBounds } from "@/domain/accounting/period";
+import { AccountingRepository } from "@/repositories/accounting.repository";
+import {
   Badge,
   DataTable,
   EmptyState,
@@ -37,8 +43,10 @@ export default async function TreasuryPage() {
 
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
+  const bounds = monthBounds(today.slice(0, 7));
+  const repo = new AccountingRepository(supabase);
 
-  const [{ data: journals }, { data: moveLines }, rate, statementsRes, paymentsRes] =
+  const [{ data: journals }, { data: moveLines }, rate, statementsRes, paymentsRes, unmatchedLiquidity, openExtract] =
     await Promise.all([
       supabase
         .from("account_journals")
@@ -65,6 +73,8 @@ export default async function TreasuryPage() {
         .eq("company_id", company.id)
         .order("payment_date", { ascending: false })
         .limit(80),
+      repo.listUnmatchedLiquidityLines({ companyId: company.id }),
+      repo.listOpenStatementLines(company.id),
     ]);
 
   const statements = statementsRes.error ? [] : statementsRes.data || [];
@@ -96,12 +106,31 @@ export default async function TreasuryPage() {
     );
   }
 
+  const liquidityOptions = unmatchedLiquidity.map((l) => ({
+    id: l.id,
+    debit: l.debit,
+    credit: l.credit,
+    move_date: l.move_date,
+    journal_id: l.journal_id,
+    amount: liquiditySignedAmount(l.debit, l.credit),
+    label: `${l.move_date} · ${l.move_name || "Asiento"} · ${formatMoney(liquiditySignedAmount(l.debit, l.credit))} · ${l.account_code}`,
+  }));
+
+  const periodLiquidity = unmatchedLiquidity.filter((l) => {
+    if (!bounds) return true;
+    return l.move_date >= bounds.start && l.move_date <= bounds.end;
+  });
+  const periodExtract = openExtract.filter((l) => {
+    if (!bounds) return true;
+    return l.line_date >= bounds.start && l.line_date <= bounds.end;
+  });
+
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Libro"
         title="Caja y bancos"
-        description="Saldos de caja y banco, y conciliación con cobros y pagos."
+        description="Saldos de caja y banco, y cruce del extracto con las líneas de liquidez."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <LiquidityJournalForm />
@@ -145,6 +174,105 @@ export default async function TreasuryPage() {
           />
         )}
       </div>
+
+      <SectionCard
+        title="Sin conciliar"
+        description={`Extracto vs movimientos de caja/banco${bounds ? ` · ${bounds.name}` : ""}.`}
+      >
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
+              Extracto ({periodExtract.length})
+            </p>
+            {periodExtract.length ? (
+              <DataTable>
+                <thead>
+                  <tr>
+                    <Th>Fecha</Th>
+                    <Th>Corte</Th>
+                    <Th className="text-right">Monto</Th>
+                    <Th>Cruce</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {periodExtract.map((l) => {
+                    const matches = suggestLiquidityMatches(
+                      {
+                        amount: l.amount,
+                        line_date: l.line_date,
+                        journal_id: l.journal_id,
+                      },
+                      liquidityOptions,
+                    ).map((m) => ({
+                      id: m.id,
+                      move_date: m.move_date,
+                      amount: liquiditySignedAmount(m.debit, m.credit),
+                      label: liquidityOptions.find((o) => o.id === m.id)?.label || m.id,
+                    }));
+                    return (
+                      <tr key={l.id}>
+                        <Td>{l.line_date}</Td>
+                        <Td className="text-xs">{l.statement_name || "—"}</Td>
+                        <Td className="text-right font-mono text-xs">
+                          {formatMoney(l.amount)}
+                        </Td>
+                        <Td>
+                          <ReconcileLineForm lineId={l.id} matches={matches} />
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </DataTable>
+            ) : (
+              <p className="text-sm text-[var(--color-muted-foreground)]">
+                No hay líneas de extracto pendientes.
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
+              Caja / banco ({periodLiquidity.length})
+            </p>
+            {periodLiquidity.length ? (
+              <DataTable>
+                <thead>
+                  <tr>
+                    <Th>Fecha</Th>
+                    <Th>Asiento</Th>
+                    <Th className="text-right">Monto</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {periodLiquidity.map((l) => (
+                    <tr key={l.id}>
+                      <Td>{l.move_date || "—"}</Td>
+                      <Td>
+                        <Link
+                          href={`/app/entries/${l.move_id}`}
+                          className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
+                        >
+                          {l.move_name || "Asiento"}
+                        </Link>
+                        <div className="text-[11px] text-[var(--color-muted-foreground)]">
+                          {l.account_code} · {l.name || l.account_name}
+                        </div>
+                      </Td>
+                      <Td className="text-right font-mono text-xs">
+                        {formatMoney(liquiditySignedAmount(l.debit, l.credit))}
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </DataTable>
+            ) : (
+              <p className="text-sm text-[var(--color-muted-foreground)]">
+                No hay movimientos de caja/banco pendientes de cruce.
+              </p>
+            )}
+          </div>
+        </div>
+      </SectionCard>
 
       <SectionCard title="Conciliaciones">
         {statements.length ? (
@@ -220,7 +348,24 @@ export default async function TreasuryPage() {
                               {l.is_reconciled ? (
                                 "Sí"
                               ) : (
-                                <ReconcileLineForm lineId={l.id} payments={payments} />
+                                <ReconcileLineForm
+                                  lineId={l.id}
+                                  matches={suggestLiquidityMatches(
+                                    {
+                                      amount: Number(l.amount),
+                                      line_date: l.line_date,
+                                      journal_id: st.journal_id,
+                                    },
+                                    liquidityOptions,
+                                  ).map((m) => ({
+                                    id: m.id,
+                                    move_date: m.move_date,
+                                    amount: liquiditySignedAmount(m.debit, m.credit),
+                                    label:
+                                      liquidityOptions.find((o) => o.id === m.id)?.label ||
+                                      m.id,
+                                  }))}
+                                />
                               )}
                             </Td>
                           </tr>

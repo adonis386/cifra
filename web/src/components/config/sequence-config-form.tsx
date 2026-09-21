@@ -13,7 +13,8 @@ export function SequenceConfigForm({ sequences }: { sequences: SequenceRow[] }) 
       <p className="text-sm text-[var(--color-muted-foreground)]">
         Correlativos de comprobantes. IVA/ISLR usan período{" "}
         <span className="font-mono">AAAAMM</span> + 8 dígitos (máx. 14 para TXT
-        99035). El número de control de factura es independiente.
+        99035). El N° de control y el N° de factura de venta son independientes
+        y se pueden editar al emitir.
       </p>
       {sequences.map((seq) => (
         <SequenceRowForm key={seq.code} seq={seq} />

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { toUsd as toUsdDomain, toBs as toBsDomain } from "@/domain/money";
+import { isCompanyAdmin } from "@/domain/access/roles";
 import { publicLogoUrl } from "@/lib/company-print";
 
 export {
@@ -145,6 +146,24 @@ export async function getActiveCompany(): Promise<Company | null> {
   }
 
   return companies[0];
+}
+
+export async function getActiveCompanyRole(): Promise<{
+  company: Company;
+  role: string;
+  isAdmin: boolean;
+} | null> {
+  const company = await getActiveCompany();
+  if (!company) return null;
+  const { supabase, user } = await requireUser();
+  const { data } = await supabase
+    .from("company_members")
+    .select("role")
+    .eq("company_id", company.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const role = String(data?.role || "accountant");
+  return { company, role, isAdmin: isCompanyAdmin(role) };
 }
 
 /** Última tasa USD (Bs por 1 USD) vigente en o antes de la fecha.

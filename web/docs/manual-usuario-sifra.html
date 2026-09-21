@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sifra — Manual de usuario</title>
+  <style>
+    :root {
+      --blue: #1d6de6;
+      --blue-soft: #dbeafe;
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #e2e8f0;
+      --paper: #ffffff;
+      --wash: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--wash);
+      line-height: 1.5;
+      font-size: 11.5pt;
+    }
+    .page {
+      max-width: 210mm;
+      margin: 0 auto;
+      background: var(--paper);
+      padding: 18mm 16mm 16mm;
+    }
+    h1 { font-size: 26pt; line-height: 1.15; margin: 0 0 8px; }
+    h2 {
+      font-size: 14pt;
+      margin: 22px 0 10px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid var(--blue);
+      color: var(--ink);
+    }
+    h3 { font-size: 12pt; margin: 16px 0 6px; }
+    p { margin: 0 0 10px; }
+    .lead { font-size: 13pt; color: var(--muted); max-width: 38em; }
+    .kicker {
+      color: var(--blue);
+      font-weight: 700;
+      font-size: 10pt;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin: 0 0 8px;
+    }
+    .muted { color: var(--muted); }
+    .small { font-size: 9.5pt; color: var(--muted); }
+    ul { margin: 0 0 12px; padding-left: 1.2em; }
+    li { margin: 0 0 4px; }
+    .cover-meta { margin-top: 18px; font-size: 10.5pt; color: var(--muted); }
+    .cover-meta strong { color: var(--ink); }
+
+    .schema {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: var(--wash);
+      margin: 10px 0 14px;
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+    .flow {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 4px;
+    }
+    .box {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 5px 10px;
+      text-align: center;
+    }
+    .box b { display: inline; font-size: 10.5pt; }
+    .box span { display: inline; font-size: 8.5pt; color: var(--muted); margin-left: 6px; }
+    .box.main { border-color: var(--blue); background: #eff6ff; }
+    .arrow { text-align: center; color: var(--blue); font-size: 11pt; line-height: 1; }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .groups {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .group {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .group h4 {
+      margin: 0 0 6px;
+      font-size: 9.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--blue);
+    }
+    .group ul { margin: 0; padding-left: 1.1em; font-size: 10pt; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5pt;
+      margin: 8px 0 16px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 7px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--blue-soft); font-size: 9.5pt; }
+    .steps {
+      margin: 0 0 12px;
+      padding-left: 1.4em;
+    }
+    .steps li { margin: 0 0 8px; }
+    .callout {
+      border-left: 4px solid var(--blue);
+      background: #eff6ff;
+      padding: 10px 12px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+    }
+    .warn {
+      border-left-color: #b45309;
+      background: #fffbeb;
+    }
+    footer.site {
+      margin-top: 28px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+      font-size: 9.5pt;
+      color: var(--muted);
+    }
+    @page { size: A4; margin: 14mm 12mm 16mm; }
+    @media print {
+      body { background: #fff; }
+      .page { padding: 0; max-width: none; }
+      h2, h3 { break-after: avoid; page-break-after: avoid; }
+      .schema, .group, table, .callout { break-inside: auto; }
+      .page-break { break-before: auto; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <article class="page">
+    <p class="kicker">Manual de usuario</p>
+    <h1>Sifra</h1>
+    <p class="lead">Guía corta para usar los módulos del día a día: facturar, cobrar, llevar el libro y cumplir con el SENIAT.</p>
+    <p class="cover-meta">
+      <strong>Para:</strong> dueños de empresa, asistentes y contadores que cargan la operación.<br />
+      <strong>Idioma de la app:</strong> español · <strong>País:</strong> Venezuela (IVA, ISLR, Bs / USD).<br />
+      <strong>Desarrollado por:</strong> Informática González
+    </p>
+
+    <h2>1. Qué es Sifra (y qué no es)</h2>
+    <p>Sifra es el sistema para <strong>registrar la empresa</strong>, <strong>facturar compras y ventas</strong>, <strong>cobrar y pagar</strong>, y al cierre del mes <strong>armar libros fiscales y retenciones</strong>.</p>
+    <div class="callout warn">
+      <strong>No incluye</strong> punto de venta (caja), inventario ni pedidos. El catálogo de líneas solo guarda nombres y precios para cargar facturas más rápido.
+    </div>
+
+    <h2>2. Esquema: cómo se conectan los módulos</h2>
+    <p>Piensa el sistema como una cadena. Cada eslabón alimenta al siguiente. Si falta el cliente o la factura, el libro y la retención no pueden salir bien.</p>
+
+    <div class="schema">
+      <div class="flow">
+        <div class="box"><b>Empresa</b><span>RIF, logo y membrete · perfil arriba a la derecha</span></div>
+        <div class="arrow">↓</div>
+        <div class="box"><b>Clientes y proveedores</b><span>Quién te compra y a quién le compras</span></div>
+        <div class="arrow">↓</div>
+        <div class="box main"><b>Facturas</b><span>El documento del día: compra o venta, IVA e ISLR</span></div>
+        <div class="arrow">↓</div>
+        <div class="row">
+          <div class="box"><b>Cobros y pagos</b><span>Baja el saldo de la factura</span></div>
+          <div class="box"><b>Tesorería</b><span>Caja y banco, conciliación</span></div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="box"><b>Asientos</b><span>La contabilidad se arma sola al confirmar facturas y pagos</span></div>
+        <div class="arrow">↓</div>
+        <div class="row">
+          <div class="box main"><b>Libros fiscales</b><span>Compras Art. 75 · Ventas Art. 76</span></div>
+          <div class="box main"><b>Retenciones</b><span>IVA, ISLR y municipal</span></div>
+        </div>
+      </div>
+
+      <div class="groups">
+        <div class="group">
+          <h4>Operar</h4>
+          <ul>
+            <li>Inicio</li>
+            <li>Facturas</li>
+            <li>Clientes / proveedores</li>
+            <li>Cobros / pagos</li>
+          </ul>
+        </div>
+        <div class="group">
+          <h4>Libro</h4>
+          <ul>
+            <li>Tesorería</li>
+            <li>Asientos</li>
+          </ul>
+        </div>
+        <div class="group">
+          <h4>Cumplir</h4>
+          <ul>
+            <li>Libros</li>
+            <li>Retenciones</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <h2>3. Cómo empezar (primera vez)</h2>
+    <p><strong>1.</strong> Entra con tu correo. Si tienes más de una empresa, elige la activa en el perfil (arriba a la derecha).</p>
+    <p><strong>2.</strong> Crea la empresa con razón social y RIF. Sin empresa no hay facturas ni libros.</p>
+    <p><strong>3.</strong> Sube el logo en Configuración → membrete. Ese logo sale en el perfil y en los PDF.</p>
+    <p><strong>4.</strong> Carga un cliente o proveedor (RIF o cédula, dirección, contacto).</p>
+    <p><strong>5.</strong> Emite la primera factura (venta o compra). Confírmala. Después cobra o paga.</p>
+    <p class="small">El perfil (nombre de la empresa, arriba a la derecha) abre el menú para cambiar de empresa, crear otra, ir a configuración o salir.</p>
+
+    <h2>4. Módulos del menú, en palabras simples</h2>
+
+    <h3>Inicio</h3>
+    <p>Resumen del mes: cuánto te deben, cuánto debes, facturas recientes y recordatorios de SENIAT. Úsalo para ver “cómo vamos”, no para cargar datos.</p>
+
+    <h3>Facturas</h3>
+    <p>Aquí nace casi todo. Puedes registrar <strong>venta</strong> (tú facturas al cliente) o <strong>compra</strong> (te factura el proveedor). Cada documento lleva control, IVA (8 / 16 / 31) y, si aplica, ISLR. Al confirmar, Sifra crea el asiento y deja saldo pendiente hasta que cobres o pagues.</p>
+    <ul>
+      <li><strong>Borrador:</strong> todavía se puede corregir.</li>
+      <li><strong>Confirmada / emitida:</strong> ya cuenta para libros y saldo.</li>
+      <li><strong>Anulada:</strong> no se usa; no la borres a mano del mes si ya la reportaste.</li>
+    </ul>
+
+    <h3>Clientes / proveedores</h3>
+    <p>La ficha de cada tercero: si es persona o empresa, RIF o cédula, dirección en Venezuela y contacto. Las facturas, los libros y las retenciones toman estos datos. Si el RIF está mal, el TXT y el XML del SENIAT también saldrán mal.</p>
+
+    <h3>Cobros / pagos</h3>
+    <p>Cuando el cliente te paga, o cuando tú le pagas al proveedor, lo registras aquí y lo <strong>aplicas a las facturas abiertas</strong>. Así baja “cuánto falta”. El dinero entra o sale por caja o banco (Tesorería).</p>
+
+    <h3>Tesorería (caja y bancos)</h3>
+    <p>Saldos de caja y cuentas bancarias. Sirve para conciliar: “esto que cobré, ¿ya está en el banco?”. No sustituye la factura; solo mueve el efectivo.</p>
+
+    <h3>Asientos</h3>
+    <p>Es el diario contable. La mayoría se generan solos al confirmar facturas y pagos. También puedes cargar un asiento manual para un ajuste. Si no eres contador, no hace falta entrar todos los días: basta con facturar bien.</p>
+
+    <h3>Libros</h3>
+    <p>Al cerrar el mes generas el <strong>libro de compras</strong> y el <strong>libro de ventas</strong> (Reglamento de IVA). Sifra los arma con las facturas confirmadas del período. Luego puedes exportar o imprimir.</p>
+
+    <h3>Retenciones</h3>
+    <p>Tres carpetas en una sola pantalla:</p>
+    <ul>
+      <li><strong>IVA:</strong> comprobante y archivo TXT 99035 para el SENIAT.</li>
+      <li><strong>ISLR:</strong> retención de impuesto sobre la renta y XML.</li>
+      <li><strong>Municipal:</strong> si tu alcaldía aplica retención.</li>
+    </ul>
+    <p>El monto de IVA e ISLR <strong>sale de la factura</strong>. Primero factura bien, después emite el comprobante.</p>
+
+    <h3>Configuración</h3>
+    <p>Ajustes de la empresa, no del día a día: membrete y logo, correlativos (número de factura), tasa BCV, unidad tributaria, cierre de mes y catálogo de líneas. También hay accesos al plan de cuentas, mayor, estados de cuenta, reportes y auditoría.</p>
+
+    <h2>5. El mes, de lunes a cierre</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Cuándo</th>
+          <th>Qué haces</th>
+          <th>Dónde</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Cada día</td>
+          <td>Cargas clientes nuevos, facturas, cobros y pagos</td>
+          <td>Operar</td>
+        </tr>
+        <tr>
+          <td>Cuando llega el extracto</td>
+          <td>Revisas caja y banco</td>
+          <td>Tesorería</td>
+        </tr>
+        <tr>
+          <td>Fin de mes</td>
+          <td>Generas libro de compras y de ventas</td>
+          <td>Libros</td>
+        </tr>
+        <tr>
+          <td>Fechas SENIAT</td>
+          <td>Emites retenciones IVA / ISLR y descargas TXT o XML</td>
+          <td>Retenciones</td>
+        </tr>
+        <tr>
+          <td>Si cambia el dólar o la UT</td>
+          <td>Confirmas tasa BCV y unidad tributaria</td>
+          <td>Configuración</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>6. Otras pantallas (no están en el menú diario)</h2>
+    <p>Las abres desde <strong>Configuración</strong> o por un enlace interno:</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Pantalla</th>
+          <th>Para qué</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Cuentas por cobrar</td>
+          <td>Qué te deben los clientes, por antigüedad, en Bs y USD.</td>
+        </tr>
+        <tr>
+          <td>Cuentas por pagar</td>
+          <td>Qué le debes a los proveedores.</td>
+        </tr>
+        <tr>
+          <td>Estado de cuenta</td>
+          <td>Resumen para enviarle a un cliente o proveedor.</td>
+        </tr>
+        <tr>
+          <td>Plan de cuentas / Mayor</td>
+          <td>Catálogo contable y movimientos por cuenta. Lo usa el contador.</td>
+        </tr>
+        <tr>
+          <td>Reportes</td>
+          <td>Cobranzas, mayor y control del mes para exportar.</td>
+        </tr>
+        <tr>
+          <td>Auditoría</td>
+          <td>Quién cambió un asiento o un documento.</td>
+        </tr>
+        <tr>
+          <td>Catálogo de líneas</td>
+          <td>Nombres y precios para no escribirlos en cada factura. Sin stock.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>7. Si algo “no cuadra”</h2>
+    <ul>
+      <li><strong>El logo no sale en el PDF:</strong> súbelo otra vez en Configuración → membrete y deja marcada la opción de mostrarlo.</li>
+      <li><strong>El libro viene vacío:</strong> las facturas deben estar confirmadas y dentro del mes que estás generando.</li>
+      <li><strong>La retención no calcula:</strong> revisa la factura (base, alícuota, tipo de persona) y el RIF del tercero.</li>
+      <li><strong>La tasa se ve rara:</strong> en Configuración confirma la tasa BCV del día de la factura.</li>
+      <li><strong>Cambiaste de empresa sin querer:</strong> abre el perfil (arriba a la derecha) y elige otra vez la empresa activa.</li>
+    </ul>
+
+    <div class="callout">
+      <strong>Regla de oro:</strong> primero el tercero, después la factura, después el cobro o el pago, y al final el libro y la retención. No al revés.
+    </div>
+
+    <footer class="site">
+      Sifra — contabilidad Venezuela · Manual de usuario · Informática González<br />
+      informaticagonzalez.com · contacto@informaticagonzalez.com · +58 412 366 8513
+    </footer>
+  </article>
+</body>
+</html>

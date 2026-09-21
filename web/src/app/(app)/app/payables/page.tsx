@@ -3,6 +3,7 @@ import { ReportExportActions } from "@/components/report-export-actions";
 import { agingBucket } from "@/lib/export/aging";
 import { formatDual, formatMoney, getActiveCompany, getExchangeRate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+import { POSTED_INVOICE_STATES } from "@/domain/invoices/invoice-state";
 import {
   Badge,
   DataTable,
@@ -38,7 +39,7 @@ export default async function PayablesPage() {
       .eq("company_id", company.id)
       .in("move_type", ["in_invoice", "in_refund"])
       .gt("amount_residual", 0)
-      .neq("state", "cancelled")
+      .in("state", [...POSTED_INVOICE_STATES])
       .order("invoice_date"),
     getExchangeRate(company.id, todayIso),
   ]);

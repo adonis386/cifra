@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { InvoiceForm } from "@/components/invoices/invoice-form";
+import { InvoiceForm, type InvoiceFormDraft } from "@/components/invoices/invoice-form";
 import {
   getActiveCompany,
   getExchangeRate,
@@ -7,8 +7,19 @@ import {
 } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, SectionCard } from "@/components/layout";
+import { InvoicesRepository } from "@/repositories/invoices.repository";
 
-export default async function NewInvoicePage() {
+function taxCodeFromRate(rate: number, sinCred: boolean) {
+  if (Number(rate) >= 15) return "IVA16";
+  if (Number(rate) >= 7) return "IVA8";
+  return sinCred ? "SDCF" : "EXENTO";
+}
+
+export default async function NewInvoicePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ draft?: string }>;
+}) {
   const company = await getActiveCompany();
   if (!company) {
     return (
@@ -26,6 +37,8 @@ export default async function NewInvoicePage() {
 
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
+  const params = await searchParams;
+  const invoicesRepo = new InvoicesRepository(supabase);
   const [
     { data: partners },
     { data: concepts },
@@ -33,6 +46,7 @@ export default async function NewInvoicePage() {
     taxUnitAmount,
     productsRes,
     rate,
+    draftDoc,
   ] = await Promise.all([
     supabase
       .from("partners")
@@ -57,6 +71,9 @@ export default async function NewInvoicePage() {
       .eq("active", true)
       .order("name"),
     getExchangeRate(company.id, today),
+    params.draft
+      ? invoicesRepo.getDraftWithLines(params.draft, company.id)
+      : Promise.resolve(null),
   ]);
 
   const products = productsRes.error ? [] : productsRes.data;
@@ -69,12 +86,55 @@ export default async function NewInvoicePage() {
     return true;
   });
 
+  const header = draftDoc?.header;
+  const taxAmt = Number(header?.amount_tax || 0);
+  const retainedIva = Number(header?.amount_retained_iva || 0);
+  const initialDraft: InvoiceFormDraft | null = header
+    ? {
+        id: header.id,
+        partnerId: header.partner_id,
+        moveType: header.move_type,
+        invoiceDate: header.invoice_date,
+        registrationDate: header.registration_date || header.invoice_date,
+        invoiceNumber: header.invoice_number || "",
+        controlNumber: header.control_number || "",
+        affectedDocument: header.affected_document || "",
+        currencyCode: header.currency_code || "VES",
+        exchangeRate:
+          header.exchange_rate != null && Number(header.exchange_rate) > 0
+            ? String(header.exchange_rate)
+            : "",
+        sinCred: Boolean(header.sin_cred),
+        importPlanilla: header.import_planilla || "",
+        importExpediente: header.import_file_number || "",
+        importDate: header.import_date || "",
+        withholdingPct:
+          taxAmt > 0
+            ? String(Number(((retainedIva / taxAmt) * 100).toFixed(2)))
+            : "0",
+        igtfRate: String(Number(header.igtf_rate || 0) || 0),
+        lines: (draftDoc?.lines || []).map((line, idx) => ({
+          id: line.id || String(idx + 1),
+          productId: line.product_id || "",
+          description: line.description || "",
+          quantity: String(Number(line.quantity || 1)),
+          priceUnit: String(Number(line.price_unit || 0)),
+          taxCode: taxCodeFromRate(Number(line.tax_rate || 0), Boolean(header.sin_cred)),
+          conceptId: line.concept_id || "",
+        })),
+      }
+    : null;
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Documentos"
-        title="Nueva factura"
-        description="Compra o venta con control, IVA, ISLR y tasa del día. Al guardar se abre la ficha."
+        title={initialDraft ? "Continuar borrador" : "Nueva factura"}
+        description={
+          initialDraft
+            ? "Borrador: aún no está en libros. Registrar factura confirma el documento."
+            : "Compra o venta con control, IVA, ISLR y tasa del día. Si sales, queda en borrador."
+        }
         actions={
           <Link
             href="/app/invoices"
@@ -105,6 +165,7 @@ export default async function NewInvoicePage() {
           }))}
           initialRate={rate || 0}
           taxUnitAmount={taxUnitAmount}
+          initialDraft={initialDraft}
         />
       </SectionCard>
     </div>

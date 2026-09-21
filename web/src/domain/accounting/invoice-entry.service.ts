@@ -26,10 +26,14 @@ export class InvoiceEntryDomainService {
     exempt: number;
     total: number;
     retainedIva: number;
+    residual?: number;
     accounts: InvoiceEntryAccounts;
   }): JournalLineDraft[] {
     const lines: JournalLineDraft[] = [];
-    const residualBase = this.residualAfterIva(input.total, input.retainedIva);
+    const residualBase =
+      input.residual != null
+        ? Math.max(round2(Math.abs(Number(input.residual))), 0)
+        : this.residualAfterIva(input.total, input.retainedIva);
     const { partnerAccount, incomeExpense, taxAccount } = input.accounts;
 
     if (input.isSale) {

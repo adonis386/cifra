@@ -10,6 +10,7 @@ export class InvoicesRepository {
     partnerId: string;
     moveType: string;
     invoiceNumber: string;
+    excludeId?: string;
   }) {
     const { data: dupes } = await this.supabase
       .from("invoices")
@@ -20,9 +21,56 @@ export class InvoicesRepository {
       .neq("state", "cancelled")
       .limit(500);
 
-    return (dupes || []).find((d) =>
-      sameInvoiceNumber(String(d.invoice_number || ""), input.invoiceNumber),
-    );
+    return (dupes || []).find((d) => {
+      if (input.excludeId && d.id === input.excludeId) return false;
+      return sameInvoiceNumber(String(d.invoice_number || ""), input.invoiceNumber);
+    });
+  }
+
+  async get(id: string, companyId: string) {
+    const { data } = await this.supabase
+      .from("invoices")
+      .select(
+        "id, state, partner_id, move_type, invoice_date, registration_date, invoice_number, control_number, affected_document, currency_code, exchange_rate, sin_cred, import_planilla, import_file_number, import_date, igtf_rate, amount_untaxed, amount_tax, amount_retained_iva",
+      )
+      .eq("id", id)
+      .eq("company_id", companyId)
+      .maybeSingle();
+    return data;
+  }
+
+  async getDraftWithLines(id: string, companyId: string) {
+    const header = await this.get(id, companyId);
+    if (!header || header.state !== "draft") return null;
+    const { data: lines } = await this.supabase
+      .from("invoice_lines")
+      .select(
+        "id, description, quantity, price_unit, tax_rate, amount_untaxed, amount_tax, amount_total, concept_id, product_id",
+      )
+      .eq("invoice_id", id)
+      .order("created_at");
+    return { header, lines: lines || [] };
+  }
+
+  async update(id: string, companyId: string, row: Record<string, unknown>) {
+    return this.supabase
+      .from("invoices")
+      .update(row)
+      .eq("id", id)
+      .eq("company_id", companyId)
+      .select("id")
+      .maybeSingle();
+  }
+
+  async replaceLines(
+    invoiceId: string,
+    companyId: string,
+    normalized: NormalizedInvoiceLine[],
+    withConcept: boolean,
+  ): Promise<string | null> {
+    await this.supabase.from("invoice_lines").delete().eq("invoice_id", invoiceId);
+    if (!normalized.length) return null;
+    return this.insertLines(invoiceId, companyId, normalized, withConcept);
   }
 
   async insert(row: Record<string, unknown>) {

@@ -94,6 +94,7 @@ export default async function InvoicesPage({
 
   if (estado === "cancelled") invoiceQuery = invoiceQuery.eq("state", "cancelled");
   else if (estado === "confirmed") invoiceQuery = invoiceQuery.eq("state", "confirmed");
+  else if (estado === "draft") invoiceQuery = invoiceQuery.eq("state", "draft");
   else invoiceQuery = invoiceQuery.neq("state", "cancelled");
 
   if (tipo === "ventas") invoiceQuery = invoiceQuery.in("move_type", saleTypes);
@@ -250,6 +251,7 @@ export default async function InvoicesPage({
               className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
             >
               <option value="">Activas</option>
+              <option value="draft">Borradores</option>
               <option value="confirmed">Confirmadas</option>
               <option value="not_paid">Pendiente de pago</option>
               <option value="partial">Pago parcial</option>
@@ -296,6 +298,7 @@ export default async function InvoicesPage({
                 const p = Array.isArray(partner) ? partner[0] : partner;
                 const rateVal = Number(inv.exchange_rate || 0) || null;
                 const cancelled = inv.state === "cancelled";
+                const draft = inv.state === "draft";
                 return (
                   <tr key={inv.id}>
                     <Td className="whitespace-nowrap">{inv.invoice_date}</Td>
@@ -303,6 +306,7 @@ export default async function InvoicesPage({
                       <div className="flex flex-wrap items-center gap-1">
                         <Badge>{moveLabel[inv.move_type] || inv.move_type}</Badge>
                         {inv.sin_cred ? <Badge>sin libro</Badge> : null}
+                        {draft ? <Badge>Borrador</Badge> : null}
                         {cancelled ? <Badge tone="warning">Anulada</Badge> : null}
                       </div>
                     </Td>
@@ -314,7 +318,11 @@ export default async function InvoicesPage({
                     </Td>
                     <Td>
                       <Link
-                        href={`/app/invoices/${inv.id}`}
+                        href={
+                          draft
+                            ? `/app/invoices/new?draft=${inv.id}`
+                            : `/app/invoices/${inv.id}`
+                        }
                         className="font-mono text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
                       >
                         {inv.invoice_number}
@@ -336,19 +344,30 @@ export default async function InvoicesPage({
                     </Td>
                     <Td className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Link
-                          href={`/app/invoices/${inv.id}`}
-                          className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
-                        >
-                          Ver
-                        </Link>
-                        <Link
-                          href={`/print/invoice/${inv.id}`}
-                          target="_blank"
-                          className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
-                        >
-                          Imprimir
-                        </Link>
+                        {draft ? (
+                          <Link
+                            href={`/app/invoices/new?draft=${inv.id}`}
+                            className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+                          >
+                            Continuar
+                          </Link>
+                        ) : (
+                          <>
+                            <Link
+                              href={`/app/invoices/${inv.id}`}
+                              className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+                            >
+                              Ver
+                            </Link>
+                            <Link
+                              href={`/print/invoice/${inv.id}`}
+                              target="_blank"
+                              className="rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline"
+                            >
+                              Imprimir
+                            </Link>
+                          </>
+                        )}
                         {!cancelled ? <CancelInvoiceButton invoiceId={inv.id} /> : null}
                       </div>
                     </Td>

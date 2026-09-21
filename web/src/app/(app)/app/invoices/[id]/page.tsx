@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CancelInvoiceButton } from "@/components/invoices/cancel-invoice-button";
 import { EditIvaRetentionForm } from "@/components/invoices/edit-iva-retention-form";
+import { DocumentChatter } from "@/components/chatter/document-chatter";
+import { ResetPaymentButton } from "@/components/payments/reset-payment-button";
 import {
   formatDual,
   formatMoney,
-  getActiveCompany,
+  getActiveCompanyRole,
 } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -17,6 +19,10 @@ import {
   Th,
 } from "@/components/layout";
 import { computeIslrForInvoice } from "@/lib/actions/islr";
+import { loadDocumentChatter } from "@/lib/actions/chatter";
+import { isSaleMoveType } from "@/domain/invoices/invoice-state";
+import { paymentAdminActions } from "@/domain/access/roles";
+import { paymentMethodLabel } from "@/domain/accounting/payment.service";
 
 const moveLabel: Record<string, string> = {
   in_invoice: "Compra",
@@ -36,14 +42,16 @@ export default async function InvoiceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const company = await getActiveCompany();
-  if (!company) notFound();
+  const access = await getActiveCompanyRole();
+  if (!access) notFound();
+  const company = access.company;
+  const isAdmin = access.isAdmin;
 
   const supabase = await createClient();
   const { data: inv, error: invError } = await supabase
     .from("invoices")
     .select(
-      `id, move_type, state, invoice_date, registration_date, due_date,
+      `id, partner_id, move_type, state, invoice_date, registration_date, due_date,
        invoice_number, control_number, affected_document, currency_code, exchange_rate,
        amount_untaxed, amount_tax, amount_exempt, amount_total, amount_retained_iva,
        amount_retained_islr, amount_paid, amount_residual, payment_state, notes, sin_cred,
@@ -89,7 +97,8 @@ export default async function InvoiceDetailPage({
     amount_total: number;
   }>;
 
-  const [{ data: ivaLine }, { data: islrLine }, islr, igtfRes] = await Promise.all([
+  const [{ data: ivaLine }, { data: islrLine }, islr, igtfRes, allocationsRes] =
+    await Promise.all([
     supabase
       .from("withholding_iva_lines")
       .select("withholding_id, withholding_iva(id, state, voucher_number)")
@@ -108,6 +117,36 @@ export default async function InvoiceDetailPage({
       .select("igtf_rate, amount_igtf")
       .eq("id", inv.id)
       .maybeSingle(),
+    supabase
+      .from("payment_allocations")
+      .select(
+        "id, amount, created_at, payments(id, payment_date, payment_type, reference, memo, exchange_rate, payment_method, currency_code, state, amount)",
+      )
+      .eq("invoice_id", inv.id)
+      .order("created_at"),
+  ]);
+  let allocations = allocationsRes.data;
+  if (allocationsRes.error && /payment_method|column|schema/i.test(allocationsRes.error.message)) {
+    const retry = await supabase
+      .from("payment_allocations")
+      .select(
+        "id, amount, created_at, payments(id, payment_date, payment_type, reference, memo, exchange_rate, state, amount)",
+      )
+      .eq("invoice_id", inv.id)
+      .order("created_at");
+    allocations = retry.data as typeof allocations;
+  }
+
+  const [{ data: linkedPays }, chatter] = await Promise.all([
+    supabase
+      .from("payments")
+      .select(
+        "id, payment_date, payment_type, reference, memo, payment_method, state, amount",
+      )
+      .eq("company_id", company.id)
+      .eq("invoice_id", inv.id)
+      .order("payment_date", { ascending: false }),
+    loadDocumentChatter(company.id, "invoice", inv.id),
   ]);
 
   const ivaWh = unwrap(
@@ -128,7 +167,64 @@ export default async function InvoiceDetailPage({
     ? 0
     : Number((igtfRes.data as { amount_igtf?: number } | null)?.amount_igtf || 0);
   const cancelled = inv.state === "cancelled";
+  const draft = inv.state === "draft";
+  const sale = isSaleMoveType(inv.move_type);
+  const residual = Number(inv.amount_residual || 0);
+  const paid = Number(inv.amount_paid || 0);
+  const canCollect = !cancelled && !draft && residual > 0.005;
   const money = (n: number) => (rate ? formatDual(n, rate) : formatMoney(n));
+  const paymentRows = (allocations || []).map((row) => {
+    const pay = unwrap(
+      row.payments as
+        | {
+            id?: string;
+            payment_date: string;
+            payment_type: string;
+            reference: string | null;
+            memo: string | null;
+            exchange_rate: number | null;
+            payment_method?: string | null;
+            currency_code?: string | null;
+            state?: string | null;
+            amount?: number | null;
+          }
+        | {
+            id?: string;
+            payment_date: string;
+            payment_type: string;
+            reference: string | null;
+            memo: string | null;
+            exchange_rate: number | null;
+            payment_method?: string | null;
+            currency_code?: string | null;
+            state?: string | null;
+            amount?: number | null;
+          }[]
+        | null,
+    );
+    return {
+      id: pay?.id || row.id,
+      amount: Number(row.amount || 0),
+      date: pay?.payment_date || String(row.created_at || "").slice(0, 10),
+      kind: pay?.payment_type === "outbound" ? "Pago" : "Cobro",
+      method: paymentMethodLabel(pay?.payment_method) || "—",
+      ref: pay?.reference || pay?.memo || "—",
+      state: String(pay?.state || "confirmed"),
+    };
+  });
+  const seenPay = new Set(paymentRows.map((row) => row.id));
+  for (const pay of linkedPays || []) {
+    if (seenPay.has(pay.id)) continue;
+    paymentRows.push({
+      id: pay.id,
+      amount: Number(pay.amount || 0),
+      date: pay.payment_date,
+      kind: pay.payment_type === "outbound" ? "Pago" : "Cobro",
+      method: paymentMethodLabel(pay.payment_method) || "—",
+      ref: pay.reference || pay.memo || "—",
+      state: String(pay.state || "draft"),
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -144,13 +240,34 @@ export default async function InvoiceDetailPage({
             >
               Volver al listado
             </Link>
-            <Link
-              href={`/print/invoice/${inv.id}`}
-              target="_blank"
-              className="rounded-[var(--radius-md)] bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white"
-            >
-              Imprimir
-            </Link>
+            {draft ? (
+              <Link
+                href={`/app/invoices/new?draft=${inv.id}`}
+                className="rounded-[var(--radius-md)] bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white"
+              >
+                Continuar borrador
+              </Link>
+            ) : (
+              <Link
+                href={`/print/invoice/${inv.id}`}
+                target="_blank"
+                className={`rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold ${
+                  canCollect
+                    ? "border border-[var(--color-border)] bg-white hover:border-[var(--color-primary)]"
+                    : "bg-[var(--color-primary)] text-white"
+                }`}
+              >
+                Imprimir
+              </Link>
+            )}
+            {canCollect ? (
+              <Link
+                href={`/app/payments?invoice=${inv.id}`}
+                className="rounded-[var(--radius-md)] bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white"
+              >
+                {sale ? "Registrar cobro" : "Registrar pago"}
+              </Link>
+            ) : null}
             {inv.account_move_id ? (
               <Link
                 href={`/app/entries/${inv.account_move_id}`}
@@ -195,10 +312,14 @@ export default async function InvoiceDetailPage({
       />
 
       <div className="flex flex-wrap gap-2">
-        <Badge tone={cancelled ? "warning" : "success"}>
-          {cancelled ? "Anulada" : inv.state}
+        <Badge tone={cancelled ? "warning" : draft ? "neutral" : "success"}>
+          {cancelled ? "Anulada" : draft ? "Borrador" : inv.state}
         </Badge>
-        <Badge>{inv.payment_state || "—"}</Badge>
+        {draft ? null : (
+          <Badge tone={residual <= 0.005 ? "success" : "warning"}>
+            {residual <= 0.005 ? "Pagada" : sale ? "Por cobrar" : "Por pagar"}
+          </Badge>
+        )}
         {inv.sin_cred ? <Badge>sin libro</Badge> : null}
       </div>
 
@@ -260,7 +381,7 @@ export default async function InvoiceDetailPage({
       </SectionCard>
 
       <SectionCard title="Totales y retenciones">
-        <dl className="grid gap-2 text-sm sm:grid-cols-2">
+        <dl className="grid gap-2 text-sm">
           <div className="flex justify-between gap-4">
             <span className="text-[var(--color-muted-foreground)]">Base</span>
             <span className="font-mono">{money(Number(inv.amount_untaxed))}</span>
@@ -274,7 +395,7 @@ export default async function InvoiceDetailPage({
             <span className="font-mono">{money(Number(inv.amount_exempt))}</span>
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-[var(--color-muted-foreground)]">Total</span>
+            <span className="text-[var(--color-muted-foreground)]">Total documento</span>
             <span className="font-mono font-semibold">{money(Number(inv.amount_total))}</span>
           </div>
           {igtf > 0 ? (
@@ -296,10 +417,6 @@ export default async function InvoiceDetailPage({
                 : ""}
             </span>
           </div>
-          <div className="flex justify-between gap-4">
-            <span className="text-[var(--color-muted-foreground)]">Saldo</span>
-            <span className="font-mono font-semibold">{money(Number(inv.amount_residual))}</span>
-          </div>
         </dl>
         {!cancelled && Number(inv.amount_tax) > 0 ? (
           <div className="mt-4">
@@ -311,6 +428,131 @@ export default async function InvoiceDetailPage({
           </div>
         ) : null}
       </SectionCard>
+
+      {!draft ? (
+        <SectionCard title={sale ? "Por cobrar" : "Por pagar"}>
+          <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-muted)] px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-foreground)]">
+              {residual <= 0.005
+                ? "Saldo"
+                : sale
+                  ? "Monto adeudado"
+                  : "Total a pagar"}
+            </p>
+            <p className="mt-1 font-mono text-2xl font-semibold tracking-tight">
+              {money(residual)}
+            </p>
+            <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+              {residual <= 0.005
+                ? "Esta factura quedó en cero."
+                : `Puedes partir el saldo en varios medios (divisas, Zelle, transferencia, pago móvil, débito o crédito).`}
+            </p>
+          </div>
+          <dl className="mb-4 grid gap-2 text-sm">
+            <div className="flex justify-between gap-4">
+              <span className="text-[var(--color-muted-foreground)]">Total documento</span>
+              <span className="font-mono">{money(Number(inv.amount_total))}</span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-[var(--color-muted-foreground)]">Retenciones</span>
+              <span className="font-mono">
+                {money(
+                  Number(inv.amount_retained_iva || 0) +
+                    Number(inv.amount_retained_islr || 0),
+                )}
+              </span>
+            </div>
+            <div className="flex justify-between gap-4">
+              <span className="text-[var(--color-muted-foreground)]">
+                {sale ? "Cobrado" : "Pagado"}
+              </span>
+              <span className="font-mono">{money(paid)}</span>
+            </div>
+          </dl>
+          {paymentRows.length ? (
+            <DataTable>
+              <thead>
+                <tr>
+                  <Th>Fecha</Th>
+                  <Th>Movimiento</Th>
+                  <Th>Medio</Th>
+                  <Th>Ref</Th>
+                  <Th className="text-right">Aplicado</Th>
+                  <Th></Th>
+                </tr>
+              </thead>
+              <tbody>
+                {paymentRows.map((row) => {
+                  const adminActs = paymentAdminActions(row.state);
+                  return (
+                  <tr key={row.id}>
+                    <Td className="whitespace-nowrap">{row.date}</Td>
+                    <Td>
+                      {row.kind}
+                      {row.state === "draft" ? (
+                        <Badge tone="warning">Borrador</Badge>
+                      ) : null}
+                    </Td>
+                    <Td>{row.method}</Td>
+                    <Td className="text-xs text-[var(--color-muted-foreground)]">
+                      {row.ref}
+                    </Td>
+                    <Td className="text-right font-mono">{money(row.amount)}</Td>
+                    <Td>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Link
+                          href={`/app/payments/${row.id}`}
+                          className="text-xs font-semibold text-[var(--color-primary)] underline"
+                        >
+                          Ver
+                        </Link>
+                        {isAdmin && adminActs.canEdit ? (
+                          <Link
+                            href={`/app/payments/${row.id}`}
+                            className="text-xs font-semibold underline"
+                          >
+                            Editar
+                          </Link>
+                        ) : null}
+                        {isAdmin && adminActs.canReset ? (
+                          <ResetPaymentButton paymentId={row.id} />
+                        ) : null}
+                      </div>
+                    </Td>
+                  </tr>
+                  );
+                })}
+              </tbody>
+            </DataTable>
+          ) : (
+            <p className="text-sm text-[var(--color-muted-foreground)]">
+              Aún no hay cobros ni pagos aplicados a esta factura.
+            </p>
+          )}
+          {canCollect ? (
+            <div className="mt-4">
+              <Link
+                href={`/app/payments?invoice=${inv.id}`}
+                className="inline-flex rounded-[var(--radius-md)] bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white"
+              >
+                {sale ? "Registrar cobro" : "Registrar pago"}
+              </Link>
+            </div>
+          ) : null}
+        </SectionCard>
+      ) : null}
+
+      {!draft ? (
+        <DocumentChatter
+          resModel="invoice"
+          resId={inv.id}
+          messages={chatter}
+          payments={paymentRows.map((row) => ({
+            id: row.id,
+            label: `${row.date} · ${row.method} · ${row.kind}`,
+          }))}
+        />
+      ) : null}
     </div>
   );
 }

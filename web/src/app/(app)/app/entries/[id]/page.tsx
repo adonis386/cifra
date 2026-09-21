@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatMoney, getActiveCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+import { matchError } from "@/domain/accounting/reconcile.service";
+import { AccountingRepository } from "@/repositories/accounting.repository";
+import { ReconcileMoveLineForm } from "@/components/entries/reconcile-line-form";
 import {
   Badge,
   DataTable,
@@ -13,7 +16,7 @@ import {
 
 type Partner = { name: string; rif?: string } | null;
 type Journal = { code: string; name: string } | null;
-type Account = { code: string; name: string } | null;
+type Account = { code: string; name: string; reconcile?: boolean } | null;
 
 function one<T>(v: T | T[] | null | undefined): T | null {
   if (!v) return null;
@@ -44,7 +47,7 @@ export default async function EntryDetailPage({
   const { data: lines } = await supabase
     .from("account_move_lines")
     .select(
-      "id, name, debit, credit, amount_residual, account_accounts(code, name), partners(name)",
+      "id, name, debit, credit, amount_residual, partner_id, account_id, invoice_id, reconciled, account_accounts(code, name, reconcile), partners(name)",
     )
     .eq("move_id", move.id)
     .order("debit", { ascending: false });
@@ -59,6 +62,48 @@ export default async function EntryDetailPage({
     move.state === "posted" ||
     move.state === "confirmed" ||
     move.state === "done";
+
+  const repo = new AccountingRepository(supabase);
+  const openRows = rows.filter((l) => {
+    const account = one(l.account_accounts as Account | Account[]);
+    return (
+      Number(l.amount_residual || 0) > 0.009 &&
+      Boolean(l.partner_id) &&
+      Boolean(account?.reconcile)
+    );
+  });
+  const counterpartsByLine = new Map<
+    string,
+    Array<{ id: string; label: string }>
+  >();
+  await Promise.all(
+    openRows.map(async (l) => {
+      const source = {
+        id: l.id,
+        account_id: l.account_id,
+        partner_id: l.partner_id,
+        debit: Number(l.debit),
+        credit: Number(l.credit),
+        amount_residual: Number(l.amount_residual),
+        invoice_id: l.invoice_id || null,
+      };
+      const options = (
+        await repo.listOpenCounterparts({
+          companyId: company.id,
+          partnerId: l.partner_id as string,
+          accountId: l.account_id,
+          excludeId: l.id,
+        })
+      ).filter((c) => !matchError(source, c));
+      counterpartsByLine.set(
+        l.id,
+        options.map((c) => ({
+          id: c.id,
+          label: `${c.name || "Línea"} · saldo ${formatMoney(c.amount_residual)}`,
+        })),
+      );
+    }),
+  );
 
   return (
     <div className="space-y-8">
@@ -157,14 +202,16 @@ export default async function EntryDetailPage({
                 <Th>Tercero</Th>
                 <Th className="text-right">Débito</Th>
                 <Th className="text-right">Crédito</Th>
+                <Th className="text-right">Saldo abierto</Th>
+                <Th className="text-right">Conciliar</Th>
               </tr>
             </thead>
             <tbody>
               {rows.map((l) => {
-                const account = one(
-                  l.account_accounts as Account | Account[],
-                );
+                const account = one(l.account_accounts as Account | Account[]);
                 const linePartner = one(l.partners as Partner | Partner[]);
+                const residual = Number(l.amount_residual || 0);
+                const counterparts = counterpartsByLine.get(l.id) || [];
                 return (
                   <tr key={l.id}>
                     <Td>
@@ -185,6 +232,27 @@ export default async function EntryDetailPage({
                         ? formatMoney(Number(l.credit))
                         : "—"}
                     </Td>
+                    <Td className="text-right font-mono text-xs">
+                      {account?.reconcile
+                        ? residual > 0.009
+                          ? formatMoney(residual)
+                          : "0,00"
+                        : "—"}
+                    </Td>
+                    <Td className="text-right">
+                      {counterparts.length ? (
+                        <ReconcileMoveLineForm
+                          lineId={l.id}
+                          counterparts={counterparts}
+                        />
+                      ) : residual > 0.009 && account?.reconcile ? (
+                        <span className="text-xs text-[var(--color-muted-foreground)]">
+                          Sin contrapunta
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </Td>
                   </tr>
                 );
               })}
@@ -198,6 +266,7 @@ export default async function EntryDetailPage({
                 <Td className="text-right font-mono text-xs font-semibold">
                   {formatMoney(totalCredit)}
                 </Td>
+                <Td colSpan={2} />
               </tr>
             </tbody>
           </DataTable>

@@ -277,6 +277,7 @@ export async function GET(
             rows: data.rows.map((r) => ({
               Fecha: r.fecha,
               Tipo: r.tipo,
+              Medio: r.medio,
               Tercero: r.tercero,
               RIF: r.rif,
               Monto: r.monto,

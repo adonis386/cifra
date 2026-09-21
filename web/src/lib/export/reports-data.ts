@@ -2,6 +2,8 @@ import { agingBucket, partnerName } from "@/lib/export/aging";
 import { getActiveCompany, getExchangeRate } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { sameInvoiceNumber } from "@/lib/invoice-number";
+import { POSTED_INVOICE_STATES } from "@/domain/invoices/invoice-state";
+import { paymentMethodLabel } from "@/domain/accounting/payment.service";
 
 export async function requireCompanyContext() {
   const company = await getActiveCompany();
@@ -34,7 +36,7 @@ export async function loadOpenInvoices(kind: "receivable" | "payable") {
       .eq("company_id", ctx.company.id)
       .in("move_type", moveTypes)
       .gt("amount_residual", 0)
-      .neq("state", "cancelled")
+      .in("state", [...POSTED_INVOICE_STATES])
       .order("invoice_date"),
     getExchangeRate(ctx.company.id, todayIso),
   ]);
@@ -84,7 +86,7 @@ export async function loadPartnerStatement(opts: {
     .eq("partner_id", opts.partnerId)
     .gte("invoice_date", opts.from)
     .lte("invoice_date", opts.to)
-    .neq("state", "cancelled")
+    .in("state", [...POSTED_INVOICE_STATES])
     .order("invoice_date");
 
   type Row = {
@@ -270,6 +272,7 @@ export async function loadInvoicesList(filters?: {
   }
   if (estado === "cancelled") query = query.eq("state", "cancelled");
   else if (estado === "confirmed") query = query.eq("state", "confirmed");
+  else if (estado === "draft") query = query.eq("state", "draft");
   else query = query.neq("state", "cancelled");
   if (partnerId) query = query.eq("partner_id", partnerId);
   if (from) query = query.gte("invoice_date", from);
@@ -436,20 +439,35 @@ export async function loadPayments() {
   const ctx = await requireCompanyContext();
   if (!ctx) return null;
 
-  const { data: payments } = await ctx.supabase
+  const first = await ctx.supabase
     .from("payments")
     .select(
-      "payment_date, payment_type, amount, currency_code, exchange_rate, reference, memo, state, partners(name, rif)",
+      "payment_date, payment_type, amount, currency_code, payment_method, exchange_rate, reference, memo, state, partners(name, rif)",
     )
     .eq("company_id", ctx.company.id)
     .order("payment_date", { ascending: false })
     .limit(2000);
+  let payments = first.data;
+  if (first.error && /payment_method|column|schema/i.test(first.error.message)) {
+    const retry = await ctx.supabase
+      .from("payments")
+      .select(
+        "payment_date, payment_type, amount, currency_code, exchange_rate, reference, memo, state, partners(name, rif)",
+      )
+      .eq("company_id", ctx.company.id)
+      .order("payment_date", { ascending: false })
+      .limit(2000);
+    payments = retry.data as typeof payments;
+  }
 
   const rows = (payments || []).map((p) => {
     const partner = partnerName(p.partners as never);
     return {
       fecha: p.payment_date,
       tipo: p.payment_type === "inbound" ? "Cobro" : "Pago",
+      medio: paymentMethodLabel(
+        (p as { payment_method?: string | null }).payment_method,
+      ),
       tercero: partner.name,
       rif: partner.rif,
       monto: Number(p.amount),

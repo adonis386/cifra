@@ -7,6 +7,7 @@ import {
   getExchangeRate,
 } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
+import { POSTED_INVOICE_STATES } from "@/domain/invoices/invoice-state";
 import {
   DataTable,
   EmptyState,
@@ -62,7 +63,7 @@ export default async function StatementsPage({
           .eq("partner_id", partnerId)
           .gte("invoice_date", from)
           .lte("invoice_date", to)
-          .neq("state", "cancelled")
+          .in("state", [...POSTED_INVOICE_STATES])
           .order("invoice_date"),
         supabase
           .from("account_move_lines")

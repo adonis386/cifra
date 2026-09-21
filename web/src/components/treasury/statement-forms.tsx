@@ -133,6 +133,13 @@ export type PaymentOption = {
   partner_name: string;
 };
 
+export type LiquidityOption = {
+  id: string;
+  move_date: string;
+  amount: number;
+  label: string;
+};
+
 export function StatementCreateForm({
   journals,
   initialRate = 0,
@@ -257,7 +264,7 @@ export function StatementLineForm({
         open={open}
         onClose={() => setOpen(false)}
         title="Movimiento"
-        description="Línea del banco o caja. Puedes conciliarla con un cobro o un pago."
+        description="Línea del banco o caja. Puedes vincularla a un cobro o pago ya registrado."
       >
         <form action={action} className="grid gap-3 sm:grid-cols-2">
           <input type="hidden" name="statement_id" value={statementId} />
@@ -290,7 +297,7 @@ export function StatementLineForm({
             <Input id={`partner_${statementId}`} name="partner_name" />
           </div>
           <div className="sm:col-span-2">
-            <Label htmlFor={`pay_${statementId}`}>Conciliar con pago</Label>
+            <Label htmlFor={`pay_${statementId}`}>Vincular cobro/pago (opcional)</Label>
             <Select id={`pay_${statementId}`} name="payment_id" defaultValue="">
               <option value="">Sin conciliar</option>
               {payments.map((p) => (
@@ -319,21 +326,26 @@ export function StatementLineForm({
 
 export function ReconcileLineForm({
   lineId,
-  payments,
+  matches,
 }: {
   lineId: string;
-  payments: PaymentOption[];
+  matches: LiquidityOption[];
 }) {
   const [state, action, pending] = useActionState(reconcileStatementLine, initial);
-  if (!payments.length) return null;
+  if (!matches.length) {
+    return (
+      <span className="text-xs text-[var(--color-muted-foreground)]">
+        Sin movimiento al mismo monto
+      </span>
+    );
+  }
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="line_id" value={lineId} />
-      <Select name="payment_id" defaultValue="" aria-label="Pago a conciliar" required>
-        <option value="">Pago…</option>
-        {payments.map((p) => (
-          <option key={p.id} value={p.id}>
-            {paymentLabel(p)}
+      <Select name="move_line_id" defaultValue={matches[0]?.id || ""} aria-label="Movimiento de caja/banco" required>
+        {matches.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.label}
           </option>
         ))}
       </Select>

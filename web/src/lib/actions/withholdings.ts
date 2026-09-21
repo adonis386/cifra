@@ -53,6 +53,9 @@ export async function createIvaWithholding(
     .single();
 
   if (invErr || !invoice) return { error: "Factura no encontrada." };
+  if (invoice.state === "draft") {
+    return { error: "Registra la factura antes de emitir la retención IVA." };
+  }
 
   const { data: invLines } = await supabase
     .from("invoice_lines")
